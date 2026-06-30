@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# PyInstaller / Build outputs
+build/
+dist/
+*.spec
+
+# AI Agent folders
+.agents/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Config files
+config.json
