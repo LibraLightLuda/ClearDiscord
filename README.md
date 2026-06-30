@@ -1,112 +1,121 @@
-# Undiscord Python GUI Dashboard - 상세 이용 설명서
+# 🧹 디스코드 메시지 청소 대시보드 (Undiscord Python GUI)
 
-**Undiscord Python GUI Dashboard**는 디스코드 채널 혹은 DM 대화방에 작성된 과거 메시지를 안전하고 정밀하게 대량 삭제할 수 있는 데스크톱 GUI 프로그램입니다. 
+이 프로그램은 내가 디스코드 채팅방이나 1:1 대화방(DM)에 썼던 과거의 메시지들을 한 번에 안전하고 깨끗하게 지워주는 편리한 개인용 도구입니다.
 
-기존의 브라우저 익스텐션 방식 대신, 파이썬 기반의 독립된 프로그램 인터페이스를 채용하여 사용 편의성과 삭제 속도 제어 능력을 극대화했습니다.
+---
+
+# 🇰🇷 [한국어 설명] 초보자를 위한 상세 이용 설명서
+
+## 💡 이 프로그램은 무엇인가요?
+디스코드에서 수많은 대화를 나누다 보면, 옛날에 내가 쓴 글이나 올린 사진들을 한꺼번에 지우고 싶을 때가 있습니다. 하나하나 마우스로 지우려면 시간이 너무 오래 걸립니다. 
+이 프로그램은 **내가 지우고 싶은 방을 지정해서 내가 썼던 글들을 자동으로 빠르게 지워주는 청소기**입니다.
 
 > [!WARNING]
-> *   본 프로그램은 사용자의 디스코드 인증 토큰을 활용합니다. 디스코드 계정에 자동화 요청을 보내는 자체 봇(Self-bot) 동작은 원칙적으로 디스코드 서비스 약관(ToS)을 위반할 위험이 있습니다.
-> *   과도한 속도로 연속 삭제를 수행할 시 계정이 비활성화(정지)될 수 있으므로, 기본 권장하는 랜덤 지연 대기 시간을 반드시 사용하십시오. 본 툴의 이용으로 인해 발생하는 계정 제한 등의 불이익에 대해 개발자는 책임지지 않습니다.
+> **⚠️ 꼭 읽어주세요! (주의사항)**
+> *   디스코드는 기계(프로그램)를 이용해 글을 대량으로 빠르게 지우는 행위를 공식적으로 권장하지 않습니다.
+> *   너무 짧은 시간 동안 많은 글을 연속으로 지우면 계정이 일시 정지되거나 잠길 수 있습니다. 프로그램에서 기본으로 정해주는 안전 대기 시간(1.5초~3초)을 그대로 사용하시는 것을 강력히 권장합니다.
 
 ---
 
-## 🔒 강력한 보안: 토큰 암호화 저장소
+## ✨ 대표적인 편리한 기능들
+어려운 기술 용어 대신, 누구나 바로 쓸 수 있는 쉬운 기능들이 준비되어 있습니다.
 
-본 프로그램은 매번 수십 자리의 복잡한 디스코드 토큰을 다시 기입하는 번거로움을 해결하기 위해 **마스터 비밀번호 기반 암호화 보존** 기능을 지원합니다.
-
-1.  **마스터 비밀번호 설정**: 프로그램 최초 실행 시 토큰을 보존할 마스터 비밀번호(최소 4자 이상)를 지정합니다.
-2.  **안전한 암호화**: 기입된 토큰은 PBKDF2-HMAC-SHA256 알고리즘으로 유도된 32바이트 대칭 키와 `Fernet` 기법을 통해 강력하게 암호화되어 `config.json` 파일에 저장됩니다.
-3.  **오입력 경고**: 비밀번호를 입력할 때 한글 상태이거나 Caps Lock이 켜져 있으면 실시간으로 하단에 안내 메시지를 표시하여 입력 실수를 방지합니다.
-4.  **영구 데이터 파기**: 마스터 비밀번호를 **3회 연속 오입력**하면, 보관된 토큰이 복원 불가능하도록 디스크에서 즉각 자동 파기됩니다.
-
----
-
-## ⚙️ 사전 요구사항 및 실행 방법
-
-본 프로그램은 파이썬 3.8 이상 환경에서 구동됩니다.
-
-1.  **패키지 다운로드 또는 소스 클론**
-2.  **프로그램 실행**:
-    터미널(또는 CMD)을 열고 해당 폴더에서 아래 명령어를 실행합니다.
-    ```bash
-    python undiscord_gui.py
-    ```
-    *※ 실행에 필요한 필수 라이브러리(`requests`, `cryptography`)는 프로그램 기동 시 자동으로 검사하여 자동 설치를 수행합니다.*
+1.  **비밀번호로 로그인 열쇠 잠금 (안전 보관)**
+    *   디스코드에 접속하려면 내 계정의 고유한 "로그인 열쇠(토큰)"가 필요합니다. 이 길고 복잡한 열쇠를 매번 입력할 필요가 없도록 비밀번호를 설정해 안전하게 저장해 둡니다.
+    *   보안을 위해 **비밀번호를 3번 연속으로 틀리면**, 저장되어 있던 내 계정 열쇠 정보가 컴퓨터에서 완전히 지워집니다.
+2.  **원하는 대화방 골라 지우기**
+    *   내가 참여 중인 서버의 특정 채팅방만 지울 수도 있고, 친구와의 **1:1 개인 대화방**에 내가 쓴 글만 쏙 골라 지울 수도 있습니다.
+3.  **지우고 싶은 날짜 범위 지정하기**
+    *   "오늘 쓴 글만 지우기", "1주일 전부터 쓴 글만 지우기", "특정 날짜 사이에 쓴 글만 지우기" 등 날짜를 손쉽게 골라 청소할 수 있습니다.
+4.  **특정 글만 골라 지우기 (필터)**
+    *   특정 단어가 들어간 글만 지우기
+    *   사진이나 동영상 파일이 올라간 글만 지우기 (채널 용량 정리용)
+    *   링크 주소가 들어간 글만 지우기
 
 ---
 
-## 🧭 대시보드 옵션 상세 설명
+## 🚀 아주 쉬운 3단계 사용 방법
 
-대시보드는 크게 **4개의 설정 카드**와 **하단 제어 패널**로 나뉩니다.
+### 1단계: 청소에 필요한 정보(로그인 열쇠 및 방 주소) 준비하기
+프로그램이 내가 누군지, 어디를 청소해야 하는지 알 수 있도록 아래 3가지 정보를 미리 알아둬야 합니다.
 
-### 1. 인증 설정 (Card 1)
-*   **디스코드 인증 토큰 (Authorization Token) [필수]**:
-    사용자 계정의 고유 토큰입니다. (우측 '보기' 버튼으로 기입 상태 전환 가능)
-*   **작성자 ID**:
-    본인이 작성한 메시지만 필터링하여 지우기 위한 사용자 고유 ID입니다.
-    *※ 공란으로 비워둔 채 작업을 시작하면, 프로그램이 토큰을 통해 본인의 계정 ID를 네트워크로 안전하게 조회하여 자동으로 채워줍니다.*
+*   **🔑 내 계정의 로그인 열쇠 (인증 토큰):**
+    1. 컴퓨터 브라우저(크롬 등)로 디스코드 사이트에 접속해 로그인합니다.
+    2. 키보드 맨 위의 `F12`를 눌러 개발자 도구 창을 엽니다.
+    3. 맨 위의 메뉴 중 **네트워크(Network)** 탭을 누릅니다.
+    4. 디스코드 채팅창에 아무 글자나 적어 올리거나 방을 클릭합니다.
+    5. 개발자 도구 창 리스트에 영어 단어들이 뜨는데, 그중 하나를 누르고 오른쪽 상세 정보에서 `Authorization` 이라는 단어 옆에 있는 길고 복잡한 영어/숫자 글자들을 통째로 복사합니다.
+*   **🏠 방 주소 (서버 ID 및 채널 ID):**
+    1. 디스코드 앱 설정 -> 고급 -> **개발자 모드**를 켭니다.
+    2. 내가 지우고 싶은 서버 아이콘이나 채팅방 이름을 마우스 오른쪽 버튼으로 누르고 맨 아래에 있는 **ID 복사하기**를 누릅니다.
+    *   *※ 친구와의 1:1 대화방을 지우고 싶다면, 서버 ID 칸에 **`@me`**를 적고 채널 ID 칸에 대화방 ID를 적으시면 됩니다.*
 
-### 2. 삭제 대상 위치 및 범위 (Card 2)
-*   **서버 ID [필수]**:
-    메시지를 삭제하려는 디스코드 서버(길드)의 고유 식별 번호입니다.
-    *※ 1:1 개인 DM 혹은 그룹 DM방의 메시지를 지우고자 할 때는 **`@me`** 를 입력하십시오.*
-*   **채널 ID [필수]**:
-    메시지를 지우고자 하는 채팅 채널의 고유 ID입니다.
-    *※ 쉼표(`,`)를 사용하여 복수의 채널 ID를 나열 기입(예: `12345,67890`)하면, 해당 채널들의 메시지들을 순차적으로 일괄 청소하는 배치 작업이 구동됩니다.*
-*   **삭제 시작/종료 범위 및 퀵 셀렉트**:
-    특정 날짜 범위 내의 메시지만 타겟팅합니다. 
-    *   **시작 범위**: 이 시각 이후에 작성된 메시지만 삭제합니다.
-    *   **종료 범위**: 이 시각 이전에 작성된 메시지만 삭제합니다.
-    *   **자동완성 퀵 셀렉트**: '1일 전', '1주일 전', '1달 전' 등의 옵션을 고르면 현재 기동 시간을 기준(24시간 체계)으로 즉각 Snowflake 시간 ID를 계산하여 입력창에 채워줍니다.
+### 2단계: 프로그램 실행하고 값 입력하기
+1.  이 폴더에서 `build.bat` 파일을 더블 클릭하여 빌드된 **`UndiscordGUI.exe`** 파일을 실행하거나, 명령창에 `python undiscord_gui.py`를 입력해 프로그램을 켭니다.
+2.  사용할 비밀번호를 설정하고 로그인합니다.
+3.  준비한 로그인 열쇠(토큰), 서버 ID, 채널 ID를 빈칸에 적어 넣습니다.
 
-### 3. 메시지 상세 필터링 (Card 3)
-*   **텍스트 검색어 필터**: 특정 키워드가 포함된 메시지만 골라냅니다.
-*   **정규표현식 매칭 필터**: 이메일 패턴(`[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+`), 휴대폰 번호 등 고급 텍스트 양식 일치 메시지만 지웁니다.
-*   **링크 포함 메시지만 삭제**: 외부 웹사이트 링크가 들어간 메시지만 필터링하여 삭제합니다.
-*   **파일 첨부 메시지만 삭제**: 이미지, 동영상, 문서 파일 등이 업로드된 메시지만 선택 삭제하여 채널 용량을 효율화합니다.
-*   **NSFW 채널 검색 포함**: 연령 제한(NSFW) 채널의 메시지 검색도 포함할지 여부입니다.
-*   **핀 고정 메시지도 삭제**: 디스코드 채팅방 상단에 고정된(Pinned) 중요 안내 메시지는 안전을 위해 기본 삭제 대상에서 보호됩니다. 이를 무시하고 핀 고정 메시지까지 완벽히 지우려면 체크하십시오.
-
-### 4. 지연 시간 및 우회 속도 설정 (Card 4)
-*   **검색 대기 시간**: 디스코드 검색 서버에 API 요청을 보낸 후 다음 페이지로 넘어가기 전 대기하는 간격(기본 100ms)입니다.
-*   **삭제 대기 시간 (최소 / 최대)**:
-    Rate Limit(대량 요청 차단) 우회를 위해 메시지 하나를 지운 후 쉬는 시간입니다.
-    *   기본값: 최소 1500ms(1.5초) ~ 최대 3000ms(3초) 사이에서 무작위로 지연(Random Delay) 시간을 발생시킵니다.
-    *   *⚠️ 속도를 너무 빠르게(예: 500ms 미만) 설정할 경우, 디스코드 서버로부터 일시적 IP 차단 혹은 계정 제한 조치를 받을 수 있으므로 주의하십시오.*
+### 3단계: 청소 시작
+1.  지우고 싶은 날짜나 단어 등 옵션을 설정합니다. (잘 모르겠다면 기본 설정 그대로 두셔도 됩니다.)
+2.  하단의 **[작업 시작]** 버튼을 누릅니다.
+3.  안내창이 뜨면 확인을 누릅니다. 실시간으로 로그 창에 글이 지워지는 과정이 표시됩니다.
+4.  지우는 중간에 멈추고 싶다면 **[작업 중단]** 버튼을 누르면 안전하게 멈춥니다.
 
 ---
 
-## 🚀 단계별 빠른 시작 가이드
+# 🇺🇸 [English Explanation] User Guide for Beginners
 
-### 1단계: 토큰 및 서버/채널 ID 준비
-디스코드 자체 토큰과 각 식별값(ID)을 획득하려면 디스코드의 개발자 기능들을 활용해야 합니다.
-*   **인증 토큰 따기**: 
-    1. 웹 브라우저(크롬 등)로 디스코드 웹 사이트에 로그인합니다.
-    2. `F12`를 눌러 개발자 도구를 켜고 **네트워크(Network)** 탭으로 이동합니다.
-    3. 필터 입력창에 `/messages`를 입력한 뒤 디스코드 방에 글을 적거나 채널을 클릭합니다.
-    4. 생성되는 네트워크 요청 항목의 `Headers` -> `Request Headers` 목록에서 `Authorization` 항목에 적힌 문장을 통째로 복사합니다.
-*   **서버/채널 ID 따기**:
-    1. 디스코드 앱 설정 -> 고급 -> **개발자 모드**를 활성화합니다.
-    2. 원하는 서버 아이콘 또는 채널 이름을 우클릭한 뒤 맨 아래 **ID 복사하기**를 클릭합니다.
+## 💡 What is this program?
+When you use Discord a lot, you might want to delete all your past comments or photos at once. Deleting them one by one manually takes forever.
+This program is an **automated Discord message cleaner** that quickly finds and deletes only the messages you wrote in a specific channel or direct message (DM) room.
 
-### 2단계: 옵션 입력 및 검증
-1. 프로그램을 켜고 설정된 비밀번호를 풀고 진입합니다.
-2. 획득한 정보(토큰, 서버 ID, 채널 ID)를 대시보드에 기입합니다.
-3. 삭제하고자 하는 날짜 범위와 필터 옵션을 알맞게 지정합니다.
-
-### 3단계: 작업 시작 및 모니터링
-1. **[작업 시작]** 버튼을 누릅니다.
-2. 팝업 확인창에서 최종 동의(예)를 클릭하면 백그라운드 엔진이 활성화됩니다.
-3. 실시간으로 로그창과 상단 프로그레스바를 통해 삭제 성공/실패 현황 및 잔여 예상 시간(ETR)을 모니터링할 수 있습니다.
-4. 작업 도중 **[작업 중단]**을 누르면 진행 중인 API 통신이 마무리된 후 안전하게 프로세스가 종료됩니다.
+> [!WARNING]
+> **⚠️ Please Read! (Warnings)**
+> *   Discord does not officially support the use of automated tools (self-bots) to delete messages.
+> *   Deleting messages too fast can result in temporary or permanent account restrictions. We highly recommend using the default safe delay settings (1.5 to 3 seconds) provided by the app.
 
 ---
 
-## 🔍 트러블슈팅 (자주 묻는 질문)
+## ✨ Simple and Useful Features
+We have translated complex technical features into easy-to-use functions for everyone.
 
-*   **Q. Rate Limit(API 요청 제한)이 걸리면서 삭제가 멈춥니다.**
-    *   A. 디스코드 API는 너무 잦은 요청이 오면 자동으로 요청을 멈추고 쿨다운 시간을 적용합니다. 엔진은 이를 인지하면 로그에 경고를 표시하고 대기 시간을 자동으로 가동한 뒤 안전하게 재개하므로, 별도로 프로그램을 끄지 않고 기다려주시면 됩니다. 딜레이 설정을 조금 더 길게(최소 2000ms / 최대 4000ms) 조절해 보십시오.
-*   **Q. '보안 위험: 허가되지 않은 도메인...' 에러가 뜹니다.**
-    *   A. 본 프로그램에는 피싱 혹은 토큰 유출 방지 화이트리스트가 적용되어 있습니다. 디스코드 공식 도메인(`https://discord.com/api/v9/`)이 아닌 주소로의 접근이 감지되면 보안상 강제 차단됩니다.
-*   **Q. 개인 1:1 대화 메시지는 지울 수 없나요?**
-    *   A. 지울 수 있습니다! '서버 ID' 란에 `@me`를 기입하시고, '채널 ID' 란에 1:1 개인 DM방의 고유 채널 ID를 따서 넣으시면 본인이 해당 DM방에 썼던 메시지만 정확히 지워집니다.
+1.  **Secure Lock for Your Account Key (Password Protected)**
+    *   To connect to Discord, the app needs your account's unique "key" (called an Authorization Token). You can save this long key securely under a master password.
+    *   For your security, **if you enter the wrong password 3 times in a row**, the saved account key will be completely wiped from your computer.
+2.  **Clean Any Room You Want**
+    *   You can clean a specific text channel in a server, or target a **1-on-1 Direct Message (DM)** room to delete only your past messages.
+3.  **Choose Date Ranges**
+    *   Easily clean messages based on time, such as "Delete messages from today", "Delete messages from a week ago", or messages sent within a specific date range.
+4.  **Delete Specific Messages Only (Filters)**
+    *   Delete messages containing specific words.
+    *   Delete messages with attached images or files (great for freeing up space).
+    *   Delete messages containing links.
+
+---
+
+## 🚀 Easy 3-Step Guide
+
+### Step 1: Get Your Login Key & Room IDs
+Before starting, you need to grab 3 pieces of information so the program knows where to clean.
+
+*   **🔑 Your Account Login Key (Token):**
+    1. Log in to Discord using a web browser (like Google Chrome).
+    2. Press `F12` on your keyboard to open the Developer Tools.
+    3. Click on the **Network** tab at the top.
+    4. Type a short message in any chat room or click a channel.
+    5. Click on one of the new network requests, look at the headers on the right, find the word `Authorization`, and copy the long string of text next to it.
+*   **🏠 Server & Channel IDs:**
+    1. Go to Discord Settings -> Advanced -> turn on **Developer Mode**.
+    2. Right-click the server icon or the channel name you want to clean, and click **Copy ID** at the bottom.
+    *   *※ To clean a 1-on-1 private chat (DM), type **`@me`** in the Server ID box, and paste the DM channel ID in the Channel ID box.*
+
+### Step 2: Run the App & Enter Information
+1.  Run the **`UndiscordGUI.exe`** file (which can be generated by double-clicking `build.bat`), or run `python undiscord_gui.py` in your terminal.
+2.  Set up your master password to enter the app.
+3.  Paste your Login Key (Token), Server ID, and Channel ID into the corresponding boxes.
+
+### Step 3: Start Cleaning
+1.  Set any filters (like date ranges or keywords) if needed. If you are not sure, leave them as default.
+2.  Click the **[Start]** button at the bottom.
+3.  Confirm the prompt, and watch the messages disappear in the real-time log.
+4.  If you want to stop during the process, click **[Stop]** to safely halt the cleaner.
