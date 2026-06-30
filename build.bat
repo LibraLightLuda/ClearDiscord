@@ -29,6 +29,19 @@ if %errorlevel% neq 0 (
     echo 'requests' library is already installed.
 )
 
+python -c "import cryptography" 2>nul
+if %errorlevel% neq 0 (
+    echo 'cryptography' library is missing. Installing...
+    pip install cryptography
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to install 'cryptography'.
+        if not "%CI%"=="true" pause
+        exit /b 1
+    )
+) else (
+    echo 'cryptography' library is already installed.
+)
+
 REM 2. Check PyInstaller
 echo [2/4] Checking PyInstaller installation...
 python -c "import PyInstaller" 2>nul

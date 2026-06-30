@@ -20,6 +20,12 @@ try:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
 except ImportError:
+    # PyInstaller 패키징 환경(EXE 실행)인 경우 재귀적 pip 실행 방지
+    if getattr(sys, 'frozen', False):
+        print("[오류] 패키징된 실행 파일 내부에 'cryptography' 라이브러리가 누락되었습니다.")
+        print("빌드 시점에 'cryptography' 패키지가 포함되도록 빌드 환경을 재구성하십시오.")
+        sys.exit(1)
+        
     print("보안 암호화를 위해 'cryptography' 라이브러리가 필요합니다. 자동 설치를 시작합니다...")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "cryptography"])
