@@ -27,7 +27,7 @@ from undiscord_utils import (
 )
 from undiscord_crypto import encrypt_data, decrypt_data
 from undiscord_layout import setup_styles, create_widgets, update_ui_texts
-from undiscord_core import UndiscordCore
+from undiscord_core import UndiscordCore, fetch_guilds, fetch_channels
 from undiscord_dialogs import PasswordDialog
 from undiscord_i18n import get_system_language, MESSAGES
 
@@ -65,6 +65,8 @@ class UndiscordGUIApp:
         
         # 보안 토큰 암호화 세션 패스워드 캐싱 변수
         self.session_password = None
+        self.guilds_map = {}
+        self.channels_map = {}
 
         # 다국어(i18n) 설정 초기 감지 (기본값 설정)
         self.current_lang = get_system_language()
@@ -655,6 +657,178 @@ class UndiscordGUIApp:
             remaining=ms_to_hms(remaining)
         )
         self.var_progress_status.set(status_msg)
+
+    def load_guilds_async(self):
+        """서버 목록 조회를 위해 비동기 백그라운드 스레드를 기동합니다."""
+        token = self.var_token.get().strip()
+        msg = MESSAGES[self.current_lang]
+        if not token:
+            self.write_log('warn', msg['err_token_required_for_fetch'])
+            messagebox.showwarning(msg['err_title'], msg['err_token_required_for_fetch'])
+            return
+
+        self.btn_load_guilds.configure(state="disabled")
+        self.combo_guilds.configure(values=["Loading..."])
+        self.combo_guilds.set("Loading...")
+        self.write_log('info', msg['log_fetch_guilds_start'])
+
+        threading.Thread(target=self._load_guilds_worker, args=(token,), daemon=True).start()
+
+    def _load_guilds_worker(self, token):
+        """실제 API 연동을 수행하는 워커 스레드 함수입니다."""
+        try:
+            guilds = fetch_guilds(token)
+            self.root.after(0, self._load_guilds_success, guilds)
+        except Exception as e:
+            self.root.after(0, self._load_guilds_fail, str(e))
+
+    def _load_guilds_success(self, guilds):
+        """서버 목록 로드에 성공했을 때 UI를 갱신합니다."""
+        msg = MESSAGES[self.current_lang]
+        self.btn_load_guilds.configure(state="normal")
+        self.write_log('success', msg['log_fetch_guilds_success'].format(count=len(guilds)))
+
+        # 콤보박스에 표시할 리스트 구성
+        # 첫 번째 항목으로 "개인 DM (@me)" 추가
+        values = [msg['dm_display_name']]
+        self.guilds_map = {"@me": msg['dm_display_name']}
+        
+        for g in guilds:
+            name = g.get('name', 'Unknown Guild')
+            g_id = g.get('id', '')
+            display_name = f"{name} ({g_id})"
+            values.append(display_name)
+            self.guilds_map[g_id] = display_name
+            self.guilds_map[display_name] = g_id
+
+        self.combo_guilds.configure(values=values)
+        self.combo_guilds.current(0)
+        
+        # 기본적으로 첫 번째(DM) 선택 유도
+        self.on_guild_combo_select(None)
+
+    def _load_guilds_fail(self, err_msg):
+        """서버 목록 로드에 실패했을 때 UI 상태를 복구하고 오류 로그를 띄웁니다."""
+        msg = MESSAGES[self.current_lang]
+        self.btn_load_guilds.configure(state="normal")
+        self.combo_guilds.configure(values=[msg['combo_guild_placeholder']])
+        self.combo_guilds.set(msg['combo_guild_placeholder'])
+        self.write_log('error', msg['err_fetch_failed'].format(e=err_msg))
+        messagebox.showerror(msg['err_title'], msg['err_fetch_failed'].format(e=err_msg))
+
+    def on_guild_combo_select(self, event):
+        """서버 콤보박스 선택 시 호출되는 이벤트 핸들러입니다."""
+        msg = MESSAGES[self.current_lang]
+        val = self.combo_guilds.get()
+        if val == msg['combo_guild_placeholder'] or val == "Loading...":
+            return
+
+        if val == msg['dm_display_name']:
+            guild_id = "@me"
+        else:
+            guild_id = self.guilds_map.get(val, "")
+        
+        if not guild_id:
+            return
+
+        self.var_guild_id.set(guild_id)
+        self.load_channels_async(guild_id)
+
+    def load_channels_async(self, guild_id):
+        """서버 ID에 귀속된 채널 목록 조회를 위해 비동기 백그라운드 스레드를 기동합니다."""
+        token = self.var_token.get().strip()
+        msg = MESSAGES[self.current_lang]
+        if not token:
+            return
+
+        self.combo_channels.configure(values=["Loading..."])
+        self.combo_channels.set("Loading...")
+
+        threading.Thread(target=self._load_channels_worker, args=(token, guild_id), daemon=True).start()
+
+    def _load_channels_worker(self, token, guild_id):
+        """채널 목록 API 호출을 진행하는 워커 스레드 함수입니다."""
+        try:
+            channels = fetch_channels(token, guild_id)
+            self.root.after(0, self._load_channels_success, channels, guild_id)
+        except Exception as e:
+            self.root.after(0, self._load_channels_fail, str(e))
+
+    def _load_channels_success(self, channels, guild_id):
+        """채널 목록 로딩 성공 시 UI 갱신을 진행합니다."""
+        msg = MESSAGES[self.current_lang]
+        self.write_log('success', msg['log_fetch_channels_success'].format(count=len(channels)))
+
+        values = []
+        self.channels_map = {}
+
+        if guild_id == "@me":
+            # 개인 DM 채널들
+            for c in channels:
+                c_id = c.get('id', '')
+                c_type = c.get('type', 1)
+                
+                # recipients 파싱
+                recipients = c.get('recipients', [])
+                if recipients:
+                    user_names = []
+                    for r in recipients:
+                        g_name = r.get('global_name')
+                        u_name = r.get('username', 'Unknown')
+                        if g_name and g_name != u_name:
+                            user_names.append(f"{g_name} ({u_name})")
+                        else:
+                            user_names.append(u_name)
+                    names = ", ".join(user_names)
+                else:
+                    names = c.get('name', 'Group DM')
+                    
+                display_name = f"👤 {names} ({c_id})" if c_type == 1 else f"👥 {names} ({c_id})"
+                values.append(display_name)
+                self.channels_map[display_name] = c_id
+        else:
+            # 일반 서버 채널들 (카테고리 type 4는 제외)
+            filtered_channels = [c for c in channels if c.get('type') != 4]
+            for c in filtered_channels:
+                c_id = c.get('id', '')
+                c_name = c.get('name', 'unknown')
+                c_type = c.get('type', 0)
+                
+                prefix = "#"
+                if c_type == 2:
+                    prefix = "🔊"
+                elif c_type in [11, 12]:
+                    prefix = "🧵"
+                    
+                display_name = f"{prefix} {c_name} ({c_id})"
+                values.append(display_name)
+                self.channels_map[display_name] = c_id
+
+        if not values:
+            values = [msg['combo_channel_placeholder']]
+            self.combo_channels.configure(values=values)
+            self.combo_channels.set(msg['combo_channel_placeholder'])
+        else:
+            self.combo_channels.configure(values=values)
+            self.combo_channels.current(0)
+            self.on_channel_combo_select(None)
+
+    def _load_channels_fail(self, err_msg):
+        """채널 목록 로딩 실패 시 UI 복구 및 오류 출력합니다."""
+        msg = MESSAGES[self.current_lang]
+        self.combo_channels.configure(values=[msg['combo_channel_placeholder']])
+        self.combo_channels.set(msg['combo_channel_placeholder'])
+        self.write_log('error', msg['err_fetch_failed'].format(e=err_msg))
+
+    def on_channel_combo_select(self, event):
+        """채널 콤보박스 선택 시 호출되는 이벤트 핸들러입니다."""
+        val = self.combo_channels.get()
+        if not val or not hasattr(self, 'channels_map'):
+            return
+        
+        channel_id = self.channels_map.get(val, "")
+        if channel_id:
+            self.var_channel_id.set(channel_id)
 
 
 # ==========================================

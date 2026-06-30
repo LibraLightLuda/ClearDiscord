@@ -134,6 +134,17 @@ MESSAGES = {
         'dlg_warn_caps': "※ 경고: 현재 Caps Lock이 켜져 있습니다.",
         'dlg_warn_ko': "※ 경고: 현재 한/영 키가 활성화되어 있어 한글이 입력될 수 있습니다.",
         
+        # 자동 선택 관련 다국어
+        'btn_load_guilds': "서버 불러오기",
+        'combo_guild_placeholder': "--- 서버 자동 선택 (클릭) ---",
+        'combo_channel_placeholder': "--- 채널 자동 선택 (클릭) ---",
+        'dm_display_name': "👤 개인 DM 및 그룹 DM (@me)",
+        'log_fetch_guilds_start': "디스코드 서버 목록을 불러오는 중...",
+        'log_fetch_guilds_success': "서버 목록 {count}개를 성공적으로 가져왔습니다.",
+        'log_fetch_channels_success': "채널 목록 {count}개를 성공적으로 가져왔습니다.",
+        'err_token_required_for_fetch': "서버 목록 조회를 위해 디스코드 토큰 입력이 먼저 필요합니다!",
+        'err_fetch_failed': "목록 로드 실패: {e}",
+        
         # 로그 출력 메시지
         'log_search_author': "작성자 ID가 입력되지 않아 디스코드 인증 토큰의 본인 고유 계정 ID를 조회합니다...",
         'log_author_auto_set': "본인 계정 ID를 자동으로 불러와 적용했습니다: {my_id}",
@@ -349,6 +360,17 @@ MESSAGES = {
         'dlg_pass_label': "Password Input",
         'dlg_warn_caps': "* Warning: Caps Lock is currently ON.",
         'dlg_warn_ko': "* Warning: Hangul/English mode is active. Korean characters might be typed.",
+        
+        # Auto-fetch related messages
+        'btn_load_guilds': "Fetch Servers",
+        'combo_guild_placeholder': "--- Select Server ---",
+        'combo_channel_placeholder': "--- Select Channel ---",
+        'dm_display_name': "👤 Direct Messages (@me)",
+        'log_fetch_guilds_start': "Fetching guild list...",
+        'log_fetch_guilds_success': "Successfully fetched {count} guilds.",
+        'log_fetch_channels_success': "Successfully fetched {count} channels.",
+        'err_token_required_for_fetch': "Discord token is required to fetch servers!",
+        'err_fetch_failed': "Failed to fetch server/channel list: {e}",
         
         # Log Messages
         'log_search_author': "Author ID was not provided. Querying account details for your user ID...",

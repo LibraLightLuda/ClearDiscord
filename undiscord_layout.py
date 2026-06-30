@@ -105,16 +105,37 @@ def create_widgets(app):
     app.entry_guild_id = tk.Entry(app.card2, textvariable=app.var_guild_id, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
     app.entry_guild_id.grid(row=1, column=0, sticky="ew", padx=10, pady=2, ipady=3)
 
+    # 서버 자동 선택 콤보박스 및 로드 버튼
+    guild_auto_sub = ttk.Frame(app.card2, style='Card.TFrame')
+    guild_auto_sub.grid(row=2, column=0, sticky="ew", padx=10, pady=(2, 6))
+    guild_auto_sub.columnconfigure(0, weight=1)
+    
+    app.combo_guilds = ttk.Combobox(guild_auto_sub, state="readonly", font=("Malgun Gothic", 9))
+    app.combo_guilds.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+    app.combo_guilds.bind("<<ComboboxSelected>>", app.on_guild_combo_select)
+    
+    app.btn_load_guilds = ttk.Button(guild_auto_sub, text="서버 불러오기", width=12, style='Normal.TButton', command=app.load_guilds_async)
+    app.btn_load_guilds.grid(row=0, column=1, sticky="e")
+
     # 채널 ID
     app.lbl_channel = ttk.Label(app.card2, text="채널 ID (쉼표[,]로 다중 채널 구분 입력 가능) *", style='CardBold.TLabel')
-    app.lbl_channel.grid(row=2, column=0, sticky="w", padx=10, pady=(6, 2))
+    app.lbl_channel.grid(row=3, column=0, sticky="w", padx=10, pady=(6, 2))
     app.var_channel_id = tk.StringVar()
     app.entry_channel_id = tk.Entry(app.card2, textvariable=app.var_channel_id, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
-    app.entry_channel_id.grid(row=3, column=0, sticky="ew", padx=10, pady=2, ipady=3)
+    app.entry_channel_id.grid(row=4, column=0, sticky="ew", padx=10, pady=2, ipady=3)
+
+    # 채널 자동 선택 콤보박스
+    channel_auto_sub = ttk.Frame(app.card2, style='Card.TFrame')
+    channel_auto_sub.grid(row=5, column=0, sticky="ew", padx=10, pady=(2, 6))
+    channel_auto_sub.columnconfigure(0, weight=1)
+    
+    app.combo_channels = ttk.Combobox(channel_auto_sub, state="readonly", font=("Malgun Gothic", 9))
+    app.combo_channels.grid(row=0, column=0, sticky="ew")
+    app.combo_channels.bind("<<ComboboxSelected>>", app.on_channel_combo_select)
 
     # 범위 지정 (최소/최대)
     range_sub = ttk.Frame(app.card2, style='Card.TFrame')
-    range_sub.grid(row=4, column=0, sticky="ew", padx=10, pady=(4, 8))
+    range_sub.grid(row=6, column=0, sticky="ew", padx=10, pady=(4, 8))
     range_sub.columnconfigure(0, weight=1)
     range_sub.columnconfigure(1, weight=1)
 
@@ -376,6 +397,21 @@ def update_ui_texts(app):
     app.lbl_max_range.configure(text=msg['max_range_label'])
     app.lbl_min_quick.configure(text=msg['min_quick_lbl'])
     app.lbl_max_quick.configure(text=msg['max_quick_lbl'])
+    
+    # 신규 자동 선택 콤보박스 및 버튼 텍스트
+    app.btn_load_guilds.configure(text=msg['btn_load_guilds'])
+    
+    prev_g_val = app.combo_guilds.get()
+    placeholders_g = [MESSAGES['ko']['combo_guild_placeholder'], MESSAGES['en']['combo_guild_placeholder']]
+    if not prev_g_val or prev_g_val in placeholders_g:
+        app.combo_guilds.configure(values=[msg['combo_guild_placeholder']])
+        app.combo_guilds.set(msg['combo_guild_placeholder'])
+        
+    prev_c_val = app.combo_channels.get()
+    placeholders_c = [MESSAGES['ko']['combo_channel_placeholder'], MESSAGES['en']['combo_channel_placeholder']]
+    if not prev_c_val or prev_c_val in placeholders_c:
+        app.combo_channels.configure(values=[msg['combo_channel_placeholder']])
+        app.combo_channels.set(msg['combo_channel_placeholder'])
     
     # 카드 2 콤보박스 텍스트 리로드 (선택 인덱스 보존)
     min_idx = app.combo_min_quick.current()
