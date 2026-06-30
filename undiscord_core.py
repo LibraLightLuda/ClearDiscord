@@ -207,7 +207,7 @@ class UndiscordCore:
             self.stats['throttledTotalTime'] += w
             self.options['searchDelay'] += w
             
-            self.log('warn', MESSAGES[self.lang]['log_engine_rate_limit_search'].format(retry_after=retry_after))
+            self.log('warn', MESSAGES[self.lang]['log_engine_rate_limit_search'].format(wait_time=retry_after * 2))
             time.sleep(retry_after * 2)
             return self.search()
 

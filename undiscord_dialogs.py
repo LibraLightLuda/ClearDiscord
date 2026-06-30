@@ -31,7 +31,7 @@ class PasswordDialog:
         
         if mode == "set":
             self.dialog.title(msg['dlg_set_title'])
-            self.dialog.geometry(f"380x265+{main_x + 300}+{main_y + 200}")
+            self.dialog.geometry(f"400x265+{main_x + 300}+{main_y + 200}")
             label_text = msg['dlg_set_desc']
         else:
             self.dialog.title(msg['dlg_enter_title'])
@@ -71,6 +71,10 @@ class PasswordDialog:
         
         self.btn_ok = ttk.Button(btn_frame, text=msg['ok'], command=self.on_ok, style="Success.TButton")
         self.btn_ok.pack(side="left", padx=5)
+        
+        if self.mode == "set":
+            self.btn_disable = ttk.Button(btn_frame, text=msg['pass_use_none'], command=self.on_disable, style="Normal.TButton")
+            self.btn_disable.pack(side="left", padx=5)
         
         self.btn_cancel = ttk.Button(btn_frame, text=msg['cancel'], command=self.on_cancel, style="Normal.TButton")
         self.btn_cancel.pack(side="left", padx=5)
@@ -112,10 +116,19 @@ class PasswordDialog:
         msg = MESSAGES[self.lang]
         
         if not val:
-            warn_title = "입력 경고" if self.lang == "ko" else "Input Warning"
-            warn_msg = "비밀번호를 기입해 주셔야 합니다!" if self.lang == "ko" else "You must enter a password!"
-            messagebox.showwarning(warn_title, warn_msg)
-            return
+            if self.mode == "set":
+                warn_title = msg.get('pass_plain_warn_title', "평문 저장 경고")
+                warn_msg = msg.get('pass_plain_warn_msg', "비밀번호를 입력하지 않으면 토큰이 암호화되지 않은 채 평문으로 저장되어 보안에 취약할 수 있습니다.\n정말 비밀번호 없이 진행하시겠습니까?")
+                confirm = messagebox.askyesno(warn_title, warn_msg)
+                if confirm:
+                    self.result = ""
+                    self.dialog.destroy()
+                return
+            else:
+                warn_title = "입력 경고" if self.lang == "ko" else "Input Warning"
+                warn_msg = "비밀번호를 기입해 주셔야 합니다!" if self.lang == "ko" else "You must enter a password!"
+                messagebox.showwarning(warn_title, warn_msg)
+                return
             
         if self.mode == "set":
             confirm_val = self.entry_confirm_var.get().strip()
@@ -132,6 +145,11 @@ class PasswordDialog:
         self.result = val
         self.dialog.destroy()
  
+    def on_disable(self):
+        """사용자가 비밀번호를 사용하지 않기로 선택한 경우, 빈 결과를 설정하고 창을 닫습니다."""
+        self.result = ""
+        self.dialog.destroy()
+
     def on_cancel(self):
         """사용자가 입력을 취소한 경우 별도의 캐싱 없이 즉각 다이얼로그를 파괴합니다."""
         self.dialog.destroy()

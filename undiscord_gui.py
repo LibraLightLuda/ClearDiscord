@@ -118,15 +118,22 @@ class UndiscordGUIApp:
 
         if token_plain:
             # 세션 비밀번호가 없는 경우 비밀번호 신규 설정 대화창 유도
-            if not self.session_password:
+            if self.session_password is None:
                 dlg = PasswordDialog(self.root, mode="set", lang=self.current_lang)
-                if dlg.result:
-                    if len(dlg.result) < 8:
+                if dlg.result is not None:
+                    if dlg.result == "":
+                        self.session_password = ""
+                        self.write_log('warn', "비밀번호 설정 없이 평문으로 토큰을 저장합니다." if self.current_lang == 'ko' else "Saving token in plaintext without password setup.")
+                    elif len(dlg.result) < 8:
                         messagebox.showerror(msg['pass_err_title'], msg['pass_len_error'])
+                        self.session_password = ""
                     else:
                         self.session_password = dlg.result
                 else:
                     self.write_log('warn', msg['pass_token_skip_warn'])
+                    self.session_password = ""
+            
+            update_ui_texts(self)
             
             if self.session_password:
                 try:
@@ -155,7 +162,8 @@ class UndiscordGUIApp:
             # 암호화 관련 파라미터 직렬화 보관
             'encryptedToken': enc_token,
             'salt': salt_val,
-            'verification': verify_val
+            'verification': verify_val,
+            'token': token_plain if not self.session_password else ""
         }
         try:
             with open("config.json", "w", encoding="utf-8") as f:
@@ -229,6 +237,7 @@ class UndiscordGUIApp:
         enc_token = data.get('encryptedToken', '')
         salt_str = data.get('salt', '')
         verify_str = data.get('verification', '')
+        plain_token = data.get('token', '')
 
         if enc_token and salt_str and verify_str:
             self.var_token.set("")  # 패스워드 검증 전까지 공란 처리
@@ -264,6 +273,7 @@ class UndiscordGUIApp:
                         data['encryptedToken'] = ""
                         data['salt'] = ""
                         data['verification'] = ""
+                        data['token'] = ""
                         try:
                             with open("config.json", "w", encoding="utf-8") as f:
                                 json.dump(data, f, indent=4, ensure_ascii=False)
@@ -273,6 +283,7 @@ class UndiscordGUIApp:
                         break
             
             if success:
+                update_ui_texts(self)
                 # 비밀번호 검증 성공 시에만 메인 창 노출
                 self.root.deiconify()
             else:
@@ -282,15 +293,28 @@ class UndiscordGUIApp:
                     messagebox.showerror(msg['err_title'], msg['pass_block_err'])
                 self.root.destroy()
                 return
+        elif plain_token:
+            # 평문 토큰이 이미 저장되어 있는 경우 바로 로드
+            self.var_token.set(plain_token)
+            self.session_password = ""
+            self.write_log('success', "저장된 평문 토큰을 성공적으로 로드했습니다." if self.current_lang == 'ko' else "Successfully loaded the stored plaintext token.")
+            update_ui_texts(self)
+            self.root.deiconify()
         else:
             # 최초 실행 등으로 인해 비밀번호 정보가 아예 저장되지 않은 경우 실행 시 우선 설정하도록 강제
             self.write_log('info', msg['log_pass_no_exist'])
             dlg = PasswordDialog(self.root, mode="set", lang=self.current_lang)
-            if dlg.result:
-                if len(dlg.result) < 8:
-                    messagebox.showerror(msg['pass_err_title'], msg['pass_len_error_exit'])
-                    self.root.destroy()
-                    return
+            if dlg.result is not None:
+                if dlg.result == "":
+                    self.session_password = ""
+                    self.write_log('success', "비밀번호 설정 없이 평문으로 저장되도록 시작합니다." if self.current_lang == 'ko' else "Started without password. Tokens will be saved in plaintext.")
+                    self.save_config()
+                    self.root.deiconify()
+                elif len(dlg.result) < 8:
+                    messagebox.showerror(msg['pass_err_title'], msg['pass_len_error_exit'].replace("종료합니다", "평문 모드로 진행합니다").replace("Aborting execution", "Proceeding in plaintext mode"))
+                    self.session_password = ""
+                    self.save_config()
+                    self.root.deiconify()
                 else:
                     self.session_password = dlg.result
                     self.write_log('success', msg['log_pass_init_ok'])
@@ -298,7 +322,7 @@ class UndiscordGUIApp:
                     # 설정 성공했으므로 메인 창 노출
                     self.root.deiconify()
             else:
-                # 비밀번호 미입력 및 취소 시 경고창 없이 즉시 조용히 종료
+                self.write_log('warn', msg['pass_cancel_exit'])
                 self.root.destroy()
                 return
 
@@ -321,19 +345,27 @@ class UndiscordGUIApp:
         msg = MESSAGES[self.current_lang]
         if not token_plain:
             return
-        if self.session_password:
+        if self.session_password is not None:
             return
 
         dlg = PasswordDialog(self.root, mode="set", lang=self.current_lang)
-        if dlg.result:
-            if len(dlg.result) < 8:
+        if dlg.result is not None:
+            if dlg.result == "":
+                self.session_password = ""
+                self.write_log('warn', "비밀번호 설정 없이 평문으로 토큰을 저장합니다." if self.current_lang == 'ko' else "Saving token in plaintext without password setup.")
+                self.save_config()
+            elif len(dlg.result) < 8:
                 messagebox.showerror(msg['pass_err_title'], msg['pass_len_error'])
+                self.session_password = ""
+                self.save_config()
             else:
                 self.session_password = dlg.result
                 self.write_log('success', msg['log_pass_init_ok'])
                 self.save_config()
         else:
             self.write_log('warn', msg['pass_cancel_warn'])
+            self.session_password = ""
+            self.save_config()
 
     def toggle_token_visibility(self):
         msg = MESSAGES[self.current_lang]

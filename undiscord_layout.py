@@ -82,12 +82,16 @@ def create_widgets(app):
     app.btn_toggle_token = ttk.Button(token_sub, text="보기", width=5, style='Normal.TButton', command=app.toggle_token_visibility)
     app.btn_toggle_token.grid(row=0, column=1, padx=(5, 0), sticky="e")
 
+    # 암호화 상태 표시 라벨
+    app.lbl_crypto_status = ttk.Label(app.card1, text="", style='Card.TLabel')
+    app.lbl_crypto_status.grid(row=2, column=0, sticky="w", padx=10, pady=(4, 2))
+
     # 작성자 ID
     app.lbl_author = ttk.Label(app.card1, text="작성자 ID (미입력 시 내 계정으로 자동 기입)", style='Card.TLabel')
-    app.lbl_author.grid(row=2, column=0, sticky="w", padx=10, pady=(6, 2))
+    app.lbl_author.grid(row=3, column=0, sticky="w", padx=10, pady=(6, 2))
     app.var_author_id = tk.StringVar()
     app.entry_author_id = tk.Entry(app.card1, textvariable=app.var_author_id, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
-    app.entry_author_id.grid(row=3, column=0, sticky="ew", padx=10, pady=(2, 8), ipady=3)
+    app.entry_author_id.grid(row=4, column=0, sticky="ew", padx=10, pady=(2, 8), ipady=3)
 
     # ---- Card 2: 삭제 대상 위치 및 범위 ----
     app.card2 = ttk.LabelFrame(top_frame, text="  삭제 대상 위치 및 범위  ", style='Card.TLabelframe')
@@ -350,6 +354,14 @@ def update_ui_texts(app):
     # 카드 1: 인증 설정
     app.lbl_token.configure(text=msg['token_label'])
     app.lbl_author.configure(text=msg['author_id_label'])
+    
+    # 암호화 상태 라벨 업데이트
+    if getattr(app, 'session_password', None) == "":
+        app.lbl_crypto_status.configure(text=msg['status_plaintext'], foreground=app.color_danger)
+    elif getattr(app, 'session_password', None):
+        app.lbl_crypto_status.configure(text=msg['status_encrypted'], foreground=app.color_success)
+    else:
+        app.lbl_crypto_status.configure(text="", foreground=app.fg_white)
     
     # 토큰 보기/숨기기 버튼 상태 동기화
     if app.entry_token.cget("show") == "*":

@@ -97,6 +97,7 @@ MESSAGES = {
         'cancel': "취소",
         'yes': "예",
         'no': "아니오",
+        'pass_use_none': "사용안함",
         
         # 입력 에러 메시지
         'err_title': "입력 에러",
@@ -119,6 +120,10 @@ MESSAGES = {
         'pass_crypt_err': "토큰 암호화 과정 중 실패: {e}",
         'pass_config_err': "[경고] 설정을 파일에 저장하지 못했습니다: {e}",
         'pass_block_err': "올바른 마스터 비밀번호 인증 없이는 프로그램 실행이 차단됩니다.",
+        'pass_plain_warn_title': "평문 저장 경고",
+        'pass_plain_warn_msg': "비밀번호를 입력하지 않으면 토큰이 암호화되지 않은 채 평문으로 저장되어 보안에 취약할 수 있습니다.\n정말 비밀번호 없이 진행하시겠습니까?",
+        'status_encrypted': "보안 수준: 암호화 활성화됨 (AES-256-GCM)",
+        'status_plaintext': "보안 수준: 암호화 미사용 (평문 저장됨 - 위험)",
         
         # 마스터 비밀번호 모달 다이어로그 내부 라벨
         'dlg_set_title': "마스터 비밀번호 신규 설정",
@@ -210,7 +215,7 @@ MESSAGES = {
         'log_engine_delay': "-> 랜덤 우회 지연 대기: {val:.2f}초",
         'log_engine_search_http_err': "검색 HTTP 요청 예외: {e}",
         'log_engine_indexing': "디스코드 서버가 검색 데이터를 인덱싱 중입니다. {retry_after}초 후 다시 시도합니다...",
-        'log_engine_rate_limit_search': "검색 API 한도 도달! {retry_after * 2}초 대기 후 검색 지연을 늘려 재시도합니다...",
+        'log_engine_rate_limit_search': "검색 API 한도 도달! {wait_time}초 대기 후 검색 지연을 늘려 재시도합니다...",
         'log_engine_search_fail': "메시지 검색 실패! API 응답 코드: {status}, 본문: {err}",
         'log_engine_regex_fail': "정규표현식 패턴 필터링 실패: {e}",
         'log_engine_delete_http_err': "메시지 삭제 요청 에러: {e}",
@@ -308,6 +313,7 @@ MESSAGES = {
         'cancel': "Cancel",
         'yes': "Yes",
         'no': "No",
+        'pass_use_none': "Do Not Use",
         
         # Input Validation Errors
         'err_title': "Input Error",
@@ -330,6 +336,10 @@ MESSAGES = {
         'pass_crypt_err': "Failure during token encryption: {e}",
         'pass_config_err': "[Warning] Could not save settings to config.json: {e}",
         'pass_block_err': "Access blocked without successful master password authentication.",
+        'pass_plain_warn_title': "Plaintext Storage Warning",
+        'pass_plain_warn_msg': "If you do not set a password, the token will be stored in plaintext and may be vulnerable to security risks.\nDo you really want to proceed without a password?",
+        'status_encrypted': "Security: Encryption Enabled (AES-256-GCM)",
+        'status_plaintext': "Security: Encryption Disabled (Plaintext - Vulnerable)",
         
         # Password Modal Dialog Labels
         'dlg_set_title': "New Master Password Setup",
@@ -420,7 +430,7 @@ MESSAGES = {
         'log_engine_delay': "-> Random bypass delay: {val:.2f}s",
         'log_engine_search_http_err': "Search HTTP request exception: {e}",
         'log_engine_indexing': "Discord server is indexing search data. Retrying in {retry_after}s...",
-        'log_engine_rate_limit_search': "Search API rate limit reached! Retrying in {retry_after * 2}s with increased delay...",
+        'log_engine_rate_limit_search': "Search API rate limit reached! Retrying in {wait_time}s with increased delay...",
         'log_engine_search_fail': "Message search failed! API Response: {status}, Body: {err}",
         'log_engine_regex_fail': "Regex pattern filtering failed: {e}",
         'log_engine_delete_http_err': "Message delete request error: {e}",
