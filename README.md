@@ -1,3 +1,5 @@
+https://img.shields.io/github/downloads/LibraLightLuda/ClearDiscord/total
+
 # 🧹 디스코드 메시지 청소 대시보드 (Undiscord Python GUI)
 
 이 프로그램은 내가 디스코드 채팅방이나 1:1 대화방(DM)에 썼던 과거의 메시지들을 한 번에 안전하고 깨끗하게 지워주는 편리한 개인용 도구입니다.
