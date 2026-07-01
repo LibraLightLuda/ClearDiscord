@@ -169,5 +169,30 @@ class TestUndiscordCore(unittest.TestCase):
         self.assertEqual(mock_delete_msg.call_count, 5, "5회 실패 시 루프가 즉각 중단되어야 합니다.")
         self.assertFalse(self.core.state['running'])
 
+    @patch('undiscord_gui.UndiscordCore.search')
+    @patch('undiscord_gui.UndiscordCore.filter_response')
+    def test_empty_response_retry_limit(self, mock_filter, mock_search):
+        # search와 filter_response가 호출될 때 빈 삭제 목록을 반환하도록 모의화
+        def side_effect_search():
+            self.core.state['_searchResponse'] = {'messages': []}
+            return {'messages': []}
+
+        def side_effect_filter():
+            self.core.state['_messagesToDelete'] = []
+            self.core.state['_skippedMessages'] = []
+
+        mock_search.side_effect = side_effect_search
+        mock_filter.side_effect = side_effect_filter
+        
+        # 빠른 테스트 실행을 위해 검색 딜레이를 0으로 설정
+        self.core.options['searchDelay'] = 0
+        
+        # run() 실행
+        self.core.run(is_job=False)
+        
+        # 최초 1회 실행 + 재시도 10회 = 총 11회 호출되어야 함
+        self.assertEqual(mock_search.call_count, 11, "최초 1회 및 10회 재시도로 총 11회 호출되어야 합니다.")
+        self.assertFalse(self.core.state['running'], "10회 재시도 초과 후 루프가 중단되어야 합니다.")
+
 if __name__ == '__main__':
     unittest.main()

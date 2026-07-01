@@ -397,6 +397,9 @@ class UndiscordCore:
             channel_id=self.options['channelId']
         ))
 
+        # API 빈 페이지(검색 결과 없음) 발생 시 최대 재시도 횟수를 제한하기 위한 카운터
+        empty_retry_count = 0
+
         while self.state['running']:
             self.state['iterations'] += 1
             self.log('verb', MESSAGES[self.lang]['log_engine_fetching'])
@@ -423,6 +426,7 @@ class UndiscordCore:
             self.log('verb', MESSAGES[self.lang]['log_engine_etr'].format(etr=ms_to_hms(self.stats['etr'])))
 
             if len(self.state['_messagesToDelete']) > 0:
+                empty_retry_count = 0  # 메시지를 찾았으므로 재시도 횟수 초기화
                 if self.options.get('askForConfirmation'):
                     if self.options.get('ask_callback'):
                         preview = "\n".join([
@@ -444,15 +448,21 @@ class UndiscordCore:
                 self.delete_messages_from_list()
 
             elif len(self.state['_skippedMessages']) > 0:
+                empty_retry_count = 0  # 메시지를 찾았으므로 재시도 횟수 초기화
                 old_offset = self.state['offset']
                 self.state['offset'] += len(self.state['_skippedMessages'])
                 self.log('verb', MESSAGES[self.lang]['log_engine_skip_page'].format(old=old_offset, new=self.state['offset']))
 
             else:
-                self.log('success', MESSAGES[self.lang]['log_engine_api_end'])
-                if is_job:
-                    break
-                self.state['running'] = False
+                # API가 빈 페이지를 반환한 경우 (임시 지연 가능성 고려)
+                if empty_retry_count < 10:
+                    empty_retry_count += 1
+                    self.log('warn', MESSAGES[self.lang]['log_engine_empty_retry'].format(attempt=empty_retry_count, max_attempt=10))
+                else:
+                    self.log('success', MESSAGES[self.lang]['log_engine_api_end'])
+                    if is_job:
+                        break
+                    self.state['running'] = False
 
             if self.state['running']:
                 search_delay = self.options['searchDelay'] / 1000.0
