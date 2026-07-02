@@ -115,8 +115,8 @@ def run_login_window():
             
         window.events.loaded += on_loaded
         
-        # Windows OS에서 WebView2(Chromium) 런타임 구동을 지시합니다. (없을 시 예외가 발생하여 사용자에게 에러 로그 노출)
-        webview.start(gui='edgechromium')
+        # pywebview의 기본 브라우저 시작 구동을 지시합니다. (기본 설정이 최적의 안정성을 보장합니다)
+        webview.start()
         
     except Exception as e:
         print(f"ERROR: {e}\n{traceback.format_exc()}", flush=True)
@@ -511,10 +511,11 @@ class UndiscordGUIApp:
         self.write_log('info', msg['log_easy_login_start'])
         
         try:
-            startupinfo = None
+            creationflags = 0
             if sys.platform == 'win32':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                # STARTF_USESHOWWINDOW를 사용하면 자식 프로세스의 GUI 윈도우까지 SW_HIDE 상태로 숨겨집니다.
+                # 대신 CREATE_NO_WINDOW를 적용하여 콘솔창만 숨기고 로그인 웹뷰 창은 정상 노출되도록 보장합니다.
+                creationflags = subprocess.CREATE_NO_WINDOW
                 
             self.write_log('info', "[System LOG] 4단계: Popen 서브프로세스 팝업 시작...")
             # 교착 상태(Deadlock)를 방지하기 위해 stderr를 stdout으로 묶어서(STDOUT) 단일 파이프 스트림으로 관리합니다.
@@ -524,7 +525,7 @@ class UndiscordGUIApp:
                 stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8',
-                startupinfo=startupinfo
+                creationflags=creationflags
             )
             self.write_log('info', f"[System LOG] 서브프로세스 기동 성공. PID: {proc.pid}")
             
