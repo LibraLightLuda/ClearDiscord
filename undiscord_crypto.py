@@ -108,3 +108,62 @@ def decrypt_data(enc_data: str, password: str, salt_str: str, verify_str: str) -
         return aesgcm.decrypt(nonce, ciphertext, None).decode('utf-8')
     except Exception:
         raise ValueError("복호화 실패")
+
+
+def encrypt_ipc(data: str, key_hex: str) -> str:
+    """
+    일회성 16진수 키(key_hex)를 사용하여 데이터를 AES-GCM으로 간편하게 암호화합니다.
+    자식 프로세스에서 토큰을 표준 출력으로 암호화하여 전달할 때 사용됩니다.
+    """
+    key = bytes.fromhex(key_hex)
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    enc_bytes = aesgcm.encrypt(nonce, data.encode('utf-8'), None)
+    return base64.b64encode(nonce + enc_bytes).decode('utf-8')
+
+
+def decrypt_ipc(enc_data: str, key_hex: str) -> str:
+    """
+    일회성 16진수 키(key_hex)를 사용하여 암호화된 데이터를 복호화합니다.
+    부모 프로세스에서 자식 프로세스가 출력한 암호화된 토큰을 읽을 때 사용됩니다.
+    """
+    key = bytes.fromhex(key_hex)
+    aesgcm = AESGCM(key)
+    raw_bytes = base64.b64decode(enc_data.encode('utf-8'))
+    if len(raw_bytes) < 12:
+        raise ValueError("Invalid IPC encrypted data length")
+    nonce = raw_bytes[:12]
+    ciphertext = raw_bytes[12:]
+    return aesgcm.decrypt(nonce, ciphertext, None).decode('utf-8')
+
+
+def wipe_memory_string(string_obj: str):
+    """
+    ctypes를 사용하여 파이썬 문자열 객체가 위치한 메모리 버퍼를 직접 물리적으로 소거(Zeroing)합니다.
+    파이썬 문자열의 불변(Immutable) 성격을 강제로 우회하여 메모리 덤프 위협을 차단합니다.
+    """
+    import ctypes
+    import sys
+    
+    if not isinstance(string_obj, str) or not string_obj:
+        return
+    
+    try:
+        # CPython 기준 메모리 주소(id)와 전체 객체 바이트 크기(sizeof) 획득
+        addr = id(string_obj)
+        size = sys.getsizeof(string_obj)
+        length = len(string_obj)
+        
+        # ASCII/Latin-1 1바이트 콤팩트 문자열의 헤더 크기는 64비트 파이썬 기준 정확히 48바이트입니다.
+        # 혹시 모를 파이썬 빌드/OS 아키텍처 간 호환성을 위해 획득한 sizeof 정보 기반 동적 계산법을 혼용합니다.
+        header_size = size - length - 1
+        if header_size < 40 or header_size > 80:
+            header_size = 48  # 안전을 위한 64비트 CPython 디폴트 폴백
+            
+        data_addr = addr + header_size
+        
+        # 첫 글자를 놓치지 않고 널 바이트 종단자까지 안전하게 0으로 덮어씁니다.
+        ctypes.memset(data_addr, 0, length + 1)
+    except Exception:
+        pass
+

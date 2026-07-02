@@ -25,9 +25,16 @@ from undiscord_utils import (
     validate_discord_url,
     resource_path
 )
-from undiscord_crypto import encrypt_data, decrypt_data
+from undiscord_crypto import (
+    encrypt_data, 
+    decrypt_data,
+    encrypt_ipc,
+    decrypt_ipc,
+    wipe_memory_string
+)
 from undiscord_layout import setup_styles, create_widgets, update_ui_texts
-from undiscord_core import UndiscordCore, fetch_guilds, fetch_channels
+from undiscord_core import UndiscordCore
+from undiscord_client import fetch_guilds, fetch_channels
 from undiscord_dialogs import PasswordDialog
 from undiscord_i18n import get_system_language, MESSAGES
 
@@ -37,107 +44,7 @@ from undiscord_i18n import get_system_language, MESSAGES
 __all__ = ['UndiscordCore', 'PasswordDialog', 'to_snowflake', 'ms_to_hms']
 
 
-def run_login_window():
-    """pywebview를 사용하여 디스코드 로그인 페이지를 띄우고 토큰을 자동 추출합니다."""
-    import time
-    import threading
-    import traceback
-    import sys
-    
-    # 서브프로세스 내부의 모든 초기화 및 런타임 에러를 가로채 메인 프로세스로 리다이렉트합니다.
-    try:
-        try:
-            import webview
-        except ImportError:
-            # pywebview 자동 설치 시도
-            import subprocess
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "pywebview"])
-                import webview
-            except Exception as e:
-                print(f"ERROR: pywebview installation failed. {e}\n{traceback.format_exc()}", flush=True)
-                sys.exit(1)
-        
-        token_found = [None]
-        
-        # 디스코드 보안 차단(reCAPTCHA / Cloudflare) 우회를 위한 최신 Chrome 브라우저 User-Agent 위장
-        try:
-            webview.settings['USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        except Exception as e:
-            print(f"DEBUG: Setting user agent failed: {e}", flush=True)
-        
-        def check_token(window):
-            # 디스코드 웹 세션 토큰 추출을 위한 복합 JS (iframe LocalStorage 우회 및 Webpack Chunk 듀얼 감지)
-            js_code = """
-            (function() {
-                try {
-                    // 기법 1: iframe 생성을 통한 localStorage.token 우회 탈취
-                    let iframe = document.createElement('iframe');
-                    document.head.append(iframe);
-                    let token = iframe.contentWindow.localStorage.token;
-                    iframe.remove();
-                    if (token) {
-                        return token.replace(/"/g, '');
-                    }
-                } catch (e) {}
-                
-                try {
-                    // 기법 2: Webpack Chunk Injection 방식
-                    return (window.webpackChunkdiscord_app.push([
-                        [Math.random()],
-                        {},
-                        (req) => {
-                            for (const m of Object.keys(req.c).map((x) => req.c[x].exports)) {
-                                if (m && m.default && m.default.getToken !== undefined) {
-                                    return m.default.getToken();
-                                }
-                            }
-                        }
-                    ]));
-                } catch (e) {}
-                
-                return null;
-            })()
-            """
-            while True:
-                try:
-                    time.sleep(0.5)
-                    res = window.evaluate_js(js_code)
-                    if res and isinstance(res, str) and len(res.strip()) > 30:
-                        token_found[0] = res.strip()
-                        print(f"TOKEN:{token_found[0]}", flush=True)
-                        window.destroy()
-                        break
-                except Exception as ex:
-                    # 페이지 리다이렉션 중 일시적인 자바스크립트 실행 예외는 무시하고 감시를 유지합니다.
-                    # 단, 창이 수동으로 완전히 닫힌 경우(Exception 메시지에 파괴/닫힘 관련 문구 포함 시) 감시 루프를 탈출합니다.
-                    err_str = str(ex).lower()
-                    if any(x in err_str for x in ['close', 'destroy', 'null', 'object', 'access', 'denied']):
-                        break
-                    continue
 
-        # 반응형 레이아웃 대응 및 QR코드 로그인 영역이 숨겨지지 않도록 창 크기를 가로로 충분히 확장합니다. (width=1000)
-        window = webview.create_window(
-            title="Discord Easy Login",
-            url="https://discord.com/login",
-            width=1000,
-            height=700,
-            resizable=True
-        )
-        
-        # 렌더러 로딩 완료 이전 evaluate_js 호출로 인한 교착 상태 및 프리징 방지를 위해 loaded 이벤트 시점에 스레드 구동
-        def on_loaded():
-            t = threading.Thread(target=check_token, args=(window,), daemon=True)
-            t.start()
-            
-        window.events.loaded += on_loaded
-        
-        # pywebview의 기본 브라우저 시작 구동을 지시합니다. (기본 설정이 최적의 안정성을 보장합니다)
-        webview.start()
-        
-    except Exception as e:
-        print(f"ERROR: {e}\n{traceback.format_exc()}", flush=True)
-        sys.exit(1)
 
 
 class UndiscordGUIApp:
@@ -215,238 +122,13 @@ class UndiscordGUIApp:
 
     def save_config(self):
         """보안상 마스터 비밀번호로 암호화한 토큰을 포함한 위젯의 입력 상태를 config.json에 보존합니다."""
-        token_plain = self.var_token.get().strip()
-        enc_token = ""
-        salt_val = ""
-        verify_val = ""
-        msg = MESSAGES[self.current_lang]
-
-        if token_plain:
-            # 세션 비밀번호가 없는 경우 비밀번호 신규 설정 대화창 유도
-            if self.session_password is None:
-                dlg = PasswordDialog(self.root, mode="set", lang=self.current_lang)
-                if dlg.result is not None:
-                    if dlg.result == "":
-                        self.session_password = ""
-                        self.write_log('warn', "비밀번호 설정 없이 평문으로 토큰을 저장합니다." if self.current_lang == 'ko' else "Saving token in plaintext without password setup.")
-                    elif len(dlg.result) < 8:
-                        messagebox.showerror(msg['pass_err_title'], msg['pass_len_error'])
-                        self.session_password = ""
-                    else:
-                        self.session_password = dlg.result
-                else:
-                    self.write_log('warn', msg['pass_token_skip_warn'])
-                    self.session_password = ""
-            
-            update_ui_texts(self)
-            
-            if self.session_password:
-                try:
-                    enc_token, salt_val, verify_val = encrypt_data(token_plain, self.session_password)
-                except Exception as e:
-                    self.write_log('error', msg['pass_crypt_err'].format(e=e))
-
-        config_data = {
-            'guildId': self.var_guild_id.get(),
-            'channelId': self.var_channel_id.get(),
-            'authorId': self.var_author_id.get(),
-            'minRange': self.var_min_range.get(),
-            'maxRange': self.var_max_range.get(),
-            'minQuickSelect': self.combo_min_quick.current(),
-            'maxQuickSelect': self.combo_max_quick.current(),
-            'searchText': self.var_search_text.get(),
-            'pattern': self.var_pattern.get(),
-            'hasLink': self.var_has_link.get(),
-            'hasFile': self.var_has_file.get(),
-            'includeNsfw': self.var_include_nsfw.get(),
-            'includePinned': self.var_include_pinned.get(),
-            'searchDelay': self.var_search_delay.get(),
-            'minDelay': self.var_min_delay.get(),
-            'maxDelay': self.var_max_delay.get(),
-            'language': self.current_lang,
-            # 암호화 관련 파라미터 직렬화 보관
-            'encryptedToken': enc_token,
-            'salt': salt_val,
-            'verification': verify_val,
-            'token': token_plain if not self.session_password else ""
-        }
-        try:
-            with open("config.json", "w", encoding="utf-8") as f:
-                json.dump(config_data, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            try:
-                self.write_log('warn', msg['pass_config_err'].format(e=e))
-            except Exception:
-                pass
+        from undiscord_config import save_config
+        save_config(self)
 
     def load_config(self):
         """로컬 config.json 파일로부터 위젯 복구 및 저장된 암호화 토큰 복구를 위한 다이얼로그를 구동합니다."""
-        # 1. 이용약관 및 사용자 면책 동의(Disclaimer) 선제 수락 확인
-        temp_lang = get_system_language()
-        if os.path.exists("config.json"):
-            try:
-                with open("config.json", "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    if 'language' in cfg:
-                        temp_lang = cfg['language']
-            except Exception:
-                pass
-        
-        msg = MESSAGES[temp_lang]
-        # 동의하지 않고 닫거나 거부하면 프로그램 즉시 종료
-        if not messagebox.askyesno(msg['disclaimer_title'], msg['disclaimer_msg']):
-            self.root.destroy()
-            return
-
-        data = {}
-        if os.path.exists("config.json"):
-            try:
-                with open("config.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception as e:
-                print(f"설정 로드 중 오류: {e}")
-            
-        # 언어 설정 복원 및 UI 텍스트 동적 갱신
-        if 'language' in data:
-            self.current_lang = data['language']
-        update_ui_texts(self)
-        
-        msg = MESSAGES[self.current_lang]
-        
-        if 'guildId' in data: self.var_guild_id.set(data['guildId'])
-        if 'channelId' in data: self.var_channel_id.set(data['channelId'])
-        if 'authorId' in data: self.var_author_id.set(data['authorId'])
-        
-        # 퀵 셀렉트 콤보박스 설정 먼저 로드
-        if 'minQuickSelect' in data:
-            try:
-                self.combo_min_quick.current(data['minQuickSelect'])
-            except Exception:
-                pass
-        if 'maxQuickSelect' in data:
-            try:
-                self.combo_max_quick.current(data['maxQuickSelect'])
-            except Exception:
-                pass
-
-        # 퀵 셀렉트 설정에 따라 현재 시간 기준으로 자동 갱신. "직접 입력"인 경우에는 저장된 이전 값을 복구
-        min_sel = self.combo_min_quick.get()
-        manual_str = msg['quick_options'][0]
-        if min_sel and min_sel != manual_str:
-            self.var_min_range.set(calculate_relative_date(min_sel))
-        elif 'minRange' in data:
-            self.var_min_range.set(data['minRange'])
-
-        max_sel = self.combo_max_quick.get()
-        if max_sel and max_sel != manual_str:
-            self.var_max_range.set(calculate_relative_date(max_sel))
-        elif 'maxRange' in data:
-            self.var_max_range.set(data['maxRange'])
-
-        if 'searchText' in data: self.var_search_text.set(data['searchText'])
-        if 'pattern' in data: self.var_pattern.set(data['pattern'])
-        
-        if 'hasLink' in data: self.var_has_link.set(data['hasLink'])
-        if 'hasFile' in data: self.var_has_file.set(data['hasFile'])
-        if 'includeNsfw' in data: self.var_include_nsfw.set(data['includeNsfw'])
-        if 'includePinned' in data: self.var_include_pinned.set(data['includePinned'])
-
-        if 'searchDelay' in data: self.var_search_delay.set(data['searchDelay'])
-        if 'minDelay' in data: self.var_min_delay.set(data['minDelay'])
-        if 'maxDelay' in data: self.var_max_delay.set(data['maxDelay'])
-
-        # 암호화된 토큰 로드 시도 및 비밀번호 질문 처리
-        enc_token = data.get('encryptedToken', '')
-        salt_str = data.get('salt', '')
-        verify_str = data.get('verification', '')
-        plain_token = data.get('token', '')
-
-        if enc_token and salt_str and verify_str:
-            self.var_token.set("")  # 패스워드 검증 전까지 공란 처리
-            attempts = 0
-            max_attempts = 3
-            success = False
-
-            while attempts < max_attempts:
-                dlg = PasswordDialog(self.root, mode="enter", lang=self.current_lang)
-                if not dlg.result:
-                    self.write_log('warn', msg['pass_cancel_warn'])
-                    break
-
-                try:
-                    decrypted = decrypt_data(enc_token, dlg.result, salt_str, verify_str)
-                    self.var_token.set(decrypted)
-                    self.session_password = dlg.result
-                    self.write_log('success', msg['pass_verify_success'])
-                    success = True
-                    break
-                except ValueError:
-                    attempts += 1
-                    left = max_attempts - attempts
-                    if left > 0:
-                        messagebox.showerror(msg['pass_err_title'], msg['pass_verify_fail_fmt'].format(left=left))
-                    else:
-                        # 3회 연속 오답 시 로컬 보안 보호를 위해 저장 데이터 파괴
-                        messagebox.showerror(msg['pass_destroy_title'], msg['pass_destroy_msg'])
-                        self.session_password = None
-                        self.var_token.set("")
-                        
-                        # JSON 설정 파일 갱신 기록
-                        data['encryptedToken'] = ""
-                        data['salt'] = ""
-                        data['verification'] = ""
-                        data['token'] = ""
-                        try:
-                            with open("config.json", "w", encoding="utf-8") as f:
-                                json.dump(data, f, indent=4, ensure_ascii=False)
-                            self.write_log('error', msg['log_pass_destroy'])
-                        except Exception as ex:
-                            self.write_log('error', msg['log_pass_destroy_err'].format(ex=ex))
-                        break
-            
-            if success:
-                update_ui_texts(self)
-                # 비밀번호 검증 성공 시에만 메인 창 노출
-                self.root.deiconify()
-            else:
-                # 취소 또는 3회 실패 시 즉각 프로그램 파괴/완전 종료
-                # 3회 연속 실패한 경우에만 에러 박스를 띄움
-                if attempts >= max_attempts:
-                    messagebox.showerror(msg['err_title'], msg['pass_block_err'])
-                self.root.destroy()
-                return
-        elif plain_token:
-            # 평문 토큰이 이미 저장되어 있는 경우 바로 로드
-            self.var_token.set(plain_token)
-            self.session_password = ""
-            self.write_log('success', "저장된 평문 토큰을 성공적으로 로드했습니다." if self.current_lang == 'ko' else "Successfully loaded the stored plaintext token.")
-            update_ui_texts(self)
-            self.root.deiconify()
-        else:
-            # 최초 실행 등으로 인해 비밀번호 정보가 아예 저장되지 않은 경우 실행 시 우선 설정하도록 강제
-            self.write_log('info', msg['log_pass_no_exist'])
-            dlg = PasswordDialog(self.root, mode="set", lang=self.current_lang)
-            if dlg.result is not None:
-                if dlg.result == "":
-                    self.session_password = ""
-                    self.write_log('success', "비밀번호 설정 없이 평문으로 저장되도록 시작합니다." if self.current_lang == 'ko' else "Started without password. Tokens will be saved in plaintext.")
-                    self.save_config()
-                    self.root.deiconify()
-                elif len(dlg.result) < 8:
-                    messagebox.showerror(msg['pass_err_title'], msg['pass_len_error_exit'].replace("종료합니다", "평문 모드로 진행합니다").replace("Aborting execution", "Proceeding in plaintext mode"))
-                    self.session_password = ""
-                    self.save_config()
-                    self.root.deiconify()
-                else:
-                    self.session_password = dlg.result
-                    self.write_log('success', msg['log_pass_init_ok'])
-                    self.save_config()
-                    # 설정 성공했으므로 메인 창 노출
-                    self.root.deiconify()
-            else:
-                self.write_log('warn', msg['pass_cancel_exit'])
-                self.root.destroy()
-                return
+        from undiscord_config import load_config
+        load_config(self)
 
     def on_min_quick_select(self, event):
         sel = self.combo_min_quick.get()
@@ -533,6 +215,11 @@ class UndiscordGUIApp:
                 self.write_log('error', f"필수 라이브러리 설치 실패: {e}\n{err_trace}")
                 return
 
+        # IPC 통신용 일회용 임시 대칭키 및 IV를 안전하게 생성합니다. (32바이트 AES 키)
+        import secrets
+        import os
+        ephemeral_key = secrets.token_hex(32)
+        
         # 본래의 간편 로그인 서브프로세스 기동
         if getattr(sys, 'frozen', False):
             cmd = [sys.executable, "--login"]
@@ -541,6 +228,10 @@ class UndiscordGUIApp:
             script_path = os.path.abspath(__file__)
             cmd = [sys.executable, script_path, "--login"]
             
+        # 서브프로세스 환경 복사 및 일회용 비밀 키 주입
+        child_env = os.environ.copy()
+        child_env["ENV_SEC_KEY"] = ephemeral_key
+        
         self.write_log('info', f"[System LOG] 3단계: 서브프로세스 커맨드 구성 완료: {cmd}")
         self.write_log('info', msg['log_easy_login_start'])
         
@@ -559,7 +250,8 @@ class UndiscordGUIApp:
                 stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8',
-                creationflags=creationflags
+                creationflags=creationflags,
+                env=child_env  # 환경변수로 일회용 키 주입
             )
             self.write_log('info', f"[System LOG] 서브프로세스 기동 성공. PID: {proc.pid}")
             
@@ -571,11 +263,26 @@ class UndiscordGUIApp:
             # 실시간으로 출력을 전부 읽으며 버퍼 포화를 예방합니다.
             for line in iter(proc.stdout.readline, ''):
                 full_output.append(line)
-                if line.startswith("TOKEN:"):
+                if line.startswith("TOKEN_ENC:"):
+                    enc_val = line.strip().split("TOKEN_ENC:")[1]
+                    try:
+                        # 부모 측에서 일회성 키로 복호화
+                        token = decrypt_ipc(enc_val, ephemeral_key)
+                    except Exception as e:
+                        error_msg = f"ERROR: IPC decryption failed: {e}"
+                    break
+                elif line.startswith("TOKEN:"):
+                    # 평문 폴백 (하위 호환)
                     token = line.strip().split("TOKEN:")[1]
                     break
                 elif line.startswith("ERROR:"):
                     error_msg = line.strip()
+            
+            # 사용 후 즉시 일회성 키 소거
+            try:
+                wipe_memory_string(ephemeral_key)
+            except Exception:
+                pass
             
             # 남은 스트림 비우기 및 자식 프로세스 완전 종료 대기
             proc.wait()
@@ -603,6 +310,12 @@ class UndiscordGUIApp:
         self.write_log('success', msg['log_easy_login_success'])
         messagebox.showinfo(msg['ok'], msg['log_easy_login_success'])
         self.on_token_focus_out()  # 토큰 세션 암호화 저장 트리거
+        
+        # 메모리상 토큰 즉각 소거 (암호화 저장이 끝났으므로 복구 가능)
+        try:
+            wipe_memory_string(token)
+        except Exception:
+            pass
 
     def click_clear_log(self):
         self.log_area.delete("1.0", tk.END)
@@ -1072,6 +785,7 @@ if __name__ == "__main__":
 
     # 간편 로그인 모듈 기동 인자 검증
     if len(sys.argv) > 1 and sys.argv[1] == '--login':
+        from undiscord_login import run_login_window
         run_login_window()
         sys.exit(0)
 
