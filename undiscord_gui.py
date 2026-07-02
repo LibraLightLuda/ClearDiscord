@@ -281,6 +281,23 @@ class UndiscordGUIApp:
 
     def load_config(self):
         """로컬 config.json 파일로부터 위젯 복구 및 저장된 암호화 토큰 복구를 위한 다이얼로그를 구동합니다."""
+        # 1. 이용약관 및 사용자 면책 동의(Disclaimer) 선제 수락 확인
+        temp_lang = get_system_language()
+        if os.path.exists("config.json"):
+            try:
+                with open("config.json", "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    if 'language' in cfg:
+                        temp_lang = cfg['language']
+            except Exception:
+                pass
+        
+        msg = MESSAGES[temp_lang]
+        # 동의하지 않고 닫거나 거부하면 프로그램 즉시 종료
+        if not messagebox.askyesno(msg['disclaimer_title'], msg['disclaimer_msg']):
+            self.root.destroy()
+            return
+
         data = {}
         if os.path.exists("config.json"):
             try:

@@ -37,6 +37,8 @@ def get_system_language() -> str:
 MESSAGES = {
     'ko': {
         'title': "Undiscord Python GUI Dashboard",
+        'disclaimer_title': "보안 경고 및 사용자 동의",
+        'disclaimer_msg': "이 프로그램은 디스코드 자동 삭제 도구(셀프봇)입니다. 디스코드 약관상 셀프봇 사용은 제재(일시/영구 정지 등)를 받을 수 있습니다. 이 프로그램의 사용 권한과 책임은 전적으로 실행하는 사용자 본인에게 있으며, 그로 인한 모든 불이익(계정 불이익, 토큰 노출 등) 역시 전적으로 사용자 본인의 책임입니다.\n\n위 내용에 동의하며 책임을 감수하시겠습니까?",
         
         # 카드 프레임 제목
         'card_auth_title': "  인증 설정  ",
@@ -279,6 +281,8 @@ MESSAGES = {
         'card_delay_title': "  Delay Time & Rate-Limit Bypass  ",
         
         # Card 1: Auth Settings
+        'disclaimer_title': "Security Warning & User Consent",
+        'disclaimer_msg': "This program is an automated message deletion tool (self-bot). Using self-bots is against Discord's Terms of Service and may result in account restriction or termination. The permission and responsibility for using this tool belong entirely to the user. The developers assume no liability or responsibility for any damages (including account ban or token leak).\n\nDo you agree to these terms and assume full responsibility?",
         'token_label': "Discord Auth Token *",
         'btn_view': "Show",
         'btn_hide': "Hide",
