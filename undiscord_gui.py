@@ -41,78 +41,86 @@ def run_login_window():
     """pywebview를 사용하여 디스코드 로그인 페이지를 띄우고 토큰을 자동 추출합니다."""
     import time
     import threading
+    import traceback
+    import sys
     
+    # 서브프로세스 내부의 모든 초기화 및 런타임 에러를 가로채 메인 프로세스로 리다이렉트합니다.
     try:
-        import webview
-    except ImportError:
-        # pywebview 자동 설치 시도
-        import subprocess
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "pywebview"])
             import webview
+        except ImportError:
+            # pywebview 자동 설치 시도
+            import subprocess
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "pywebview"])
+                import webview
+            except Exception as e:
+                print(f"ERROR: pywebview installation failed. {e}\n{traceback.format_exc()}", flush=True)
+                sys.exit(1)
+        
+        token_found = [None]
+        
+        # 디스코드 보안 차단(reCAPTCHA / Cloudflare) 우회를 위한 최신 Chrome 브라우저 User-Agent 위장
+        try:
+            webview.settings['USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         except Exception as e:
-            print(f"ERROR: pywebview installation failed. {e}", file=sys.stderr)
-            sys.exit(1)
-    
-    token_found = [None]
-    
-    # 디스코드 보안 차단(reCAPTCHA / Cloudflare) 우회를 위한 최신 Chrome 브라우저 User-Agent 위장
-    try:
-        webview.settings['USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-    except Exception:
-        pass
-    
-    def check_token(window):
-        # 디스코드 웹 클라이언트에서 토큰을 추출하는 Webpack 청크 우회 자바스크립트
-        js_code = """
-        (function() {
-            try {
-                return (window.webpackChunkdiscord_app.push([
-                    [Math.random()],
-                    {},
-                    (req) => {
-                        for (const m of Object.keys(req.c).map((x) => req.c[x].exports)) {
-                            if (m && m.default && m.default.getToken !== undefined) {
-                                return m.default.getToken();
+            print(f"DEBUG: Setting user agent failed: {e}", flush=True)
+        
+        def check_token(window):
+            # 디스코드 웹 클라이언트에서 토큰을 추출하는 Webpack 청크 우회 자바스크립트
+            js_code = """
+            (function() {
+                try {
+                    return (window.webpackChunkdiscord_app.push([
+                        [Math.random()],
+                        {},
+                        (req) => {
+                            for (const m of Object.keys(req.c).map((x) => req.c[x].exports)) {
+                                if (m && m.default && m.default.getToken !== undefined) {
+                                    return m.default.getToken();
+                                }
                             }
                         }
-                    }
-                ]));
-            } catch (e) {
-                return null;
-            }
-        })()
-        """
-        while True:
-            try:
-                time.sleep(0.5)
-                res = window.evaluate_js(js_code)
-                if res and isinstance(res, str) and len(res.strip()) > 30:
-                    token_found[0] = res.strip()
-                    print(f"TOKEN:{token_found[0]}", flush=True)
-                    window.destroy()
+                    ]));
+                } catch (e) {
+                    return null;
+                }
+            })()
+            """
+            while True:
+                try:
+                    time.sleep(0.5)
+                    res = window.evaluate_js(js_code)
+                    if res and isinstance(res, str) and len(res.strip()) > 30:
+                        token_found[0] = res.strip()
+                        print(f"TOKEN:{token_found[0]}", flush=True)
+                        window.destroy()
+                        break
+                except Exception:
                     break
-            except Exception:
-                break
 
-    # 모던 스크립트 실행 불가로 인한 Blank screen 버그 방지를 위해 Edge Chromium (WebView2) 브라우저 엔진을 강제 지정합니다.
-    window = webview.create_window(
-        title="Discord Easy Login",
-        url="https://discord.com/login",
-        width=500,
-        height=680,
-        resizable=True
-    )
-    
-    # 렌더러 로딩 완료 이전 evaluate_js 호출로 인한 교착 상태 및 프리징 방지를 위해 loaded 이벤트 시점에 스레드 구동
-    def on_loaded():
-        t = threading.Thread(target=check_token, args=(window,), daemon=True)
-        t.start()
+        # 모던 스크립트 실행 불가로 인한 Blank screen 버그 방지를 위해 Edge Chromium (WebView2) 브라우저 엔진을 강제 지정합니다.
+        window = webview.create_window(
+            title="Discord Easy Login",
+            url="https://discord.com/login",
+            width=500,
+            height=680,
+            resizable=True
+        )
         
-    window.events.loaded += on_loaded
-    
-    # Windows OS에서 WebView2(Chromium) 런타임 구동을 지시합니다. (없을 시 예외가 발생하여 사용자에게 에러 로그 노출)
-    webview.start(gui='edgechromium')
+        # 렌더러 로딩 완료 이전 evaluate_js 호출로 인한 교착 상태 및 프리징 방지를 위해 loaded 이벤트 시점에 스레드 구동
+        def on_loaded():
+            t = threading.Thread(target=check_token, args=(window,), daemon=True)
+            t.start()
+            
+        window.events.loaded += on_loaded
+        
+        # Windows OS에서 WebView2(Chromium) 런타임 구동을 지시합니다. (없을 시 예외가 발생하여 사용자에게 에러 로그 노출)
+        webview.start(gui='edgechromium')
+        
+    except Exception as e:
+        print(f"ERROR: {e}\n{traceback.format_exc()}", flush=True)
+        sys.exit(1)
 
 
 class UndiscordGUIApp:
@@ -462,32 +470,36 @@ class UndiscordGUIApp:
 
     def _auto_login_thread_func(self):
         msg = MESSAGES[self.current_lang]
+        import traceback
+        import subprocess
         
-        # 1. pywebview 모듈 임포트 가능성 선제 검사 및 무소음 설치 유도
+        self.write_log('info', "[System LOG] 1단계: 간편 로그인 기동 스레드 시작")
+        
+        # pywebview 모듈 임포트 가능성 선제 검사 및 무소음 설치 유도
         try:
+            self.write_log('info', "[System LOG] 2단계: 로컬 환경 pywebview 설치 체크...")
             import webview
+            self.write_log('success', "[System LOG] pywebview 모듈 감지됨.")
         except ImportError:
             self.write_log('info', msg['err_easy_login_install'])
-            import subprocess
             try:
                 startupinfo = None
                 if sys.platform == 'win32':
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 # 메인 UI가 뜬 상태이므로 로그에 문구를 남기고 백그라운드 스레드에서 직접 설치를 진행합니다.
+                self.write_log('info', "[System LOG] pip install pywebview 명령 실행...")
                 subprocess.check_call(
                     [sys.executable, "-m", "pip", "install", "pywebview"],
                     startupinfo=startupinfo
                 )
                 self.write_log('success', "성공적으로 필수 라이브러리(pywebview)가 설치되었습니다. 로그인을 기동합니다." if self.current_lang == 'ko' else "Successfully installed pywebview! Launching login window.")
             except Exception as e:
-                self.write_log('error', f"필수 라이브러리 설치 실패: {e}\n명령창(cmd)에 'pip install pywebview'를 직접 실행해 주십시오." if self.current_lang == 'ko' else f"Failed to install library: {e}\nPlease run 'pip install pywebview' manually in your terminal.")
+                err_trace = traceback.format_exc()
+                self.write_log('error', f"필수 라이브러리 설치 실패: {e}\n{err_trace}")
                 return
 
-        # 2. 본래의 간편 로그인 서브프로세스 기동
-        self.write_log('info', msg['log_easy_login_start'])
-        
-        import subprocess
+        # 본래의 간편 로그인 서브프로세스 기동
         if getattr(sys, 'frozen', False):
             cmd = [sys.executable, "--login"]
         else:
@@ -495,12 +507,16 @@ class UndiscordGUIApp:
             script_path = os.path.abspath(__file__)
             cmd = [sys.executable, script_path, "--login"]
             
+        self.write_log('info', f"[System LOG] 3단계: 서브프로세스 커맨드 구성 완료: {cmd}")
+        self.write_log('info', msg['log_easy_login_start'])
+        
         try:
             startupinfo = None
             if sys.platform == 'win32':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
+            self.write_log('info', "[System LOG] 4단계: Popen 서브프로세스 팝업 시작...")
             # 교착 상태(Deadlock)를 방지하기 위해 stderr를 stdout으로 묶어서(STDOUT) 단일 파이프 스트림으로 관리합니다.
             proc = subprocess.Popen(
                 cmd,
@@ -510,30 +526,39 @@ class UndiscordGUIApp:
                 encoding='utf-8',
                 startupinfo=startupinfo
             )
+            self.write_log('info', f"[System LOG] 서브프로세스 기동 성공. PID: {proc.pid}")
             
             token = None
+            error_msg = None
             full_output = []
             
+            self.write_log('info', "[System LOG] 5단계: 표준 출력 스트림 실시간 폴링 중...")
             # 실시간으로 출력을 전부 읽으며 버퍼 포화를 예방합니다.
             for line in iter(proc.stdout.readline, ''):
                 full_output.append(line)
                 if line.startswith("TOKEN:"):
                     token = line.strip().split("TOKEN:")[1]
                     break
+                elif line.startswith("ERROR:"):
+                    error_msg = line.strip()
             
             # 남은 스트림 비우기 및 자식 프로세스 완전 종료 대기
             proc.wait()
+            self.write_log('info', f"[System LOG] 6단계: 서브프로세스 종료됨. Exit Code: {proc.returncode}")
             
             if token:
                 self.root.after(0, lambda: self.set_extracted_token(token))
             else:
-                err_text = "".join(full_output).strip()
-                if err_text:
-                    self.write_log('error', f"[Subprocess Log]\n{err_text}")
+                raw_log = "".join(full_output).strip()
+                if error_msg or raw_log:
+                    # 모든 에러 정보와 서브프로세스 출력 스택 트레이스를 로그창에 직접 출력
+                    self.write_log('error', f"[Subprocess Log]\n{error_msg or raw_log}")
                 self.write_log('warn', msg['log_easy_login_cancel'])
                 
         except Exception as e:
+            err_trace = traceback.format_exc()
             self.write_log('error', msg['log_easy_login_err'].format(e=e))
+            self.write_log('error', f"[Traceback Log]\n{err_trace}")
             self.root.after(0, lambda: messagebox.showerror(msg['err_title'], msg['log_easy_login_err'].format(e=e)))
 
     def set_extracted_token(self, token):
