@@ -450,6 +450,29 @@ class UndiscordGUIApp:
 
     def _auto_login_thread_func(self):
         msg = MESSAGES[self.current_lang]
+        
+        # 1. pywebview 모듈 임포트 가능성 선제 검사 및 무소음 설치 유도
+        try:
+            import webview
+        except ImportError:
+            self.write_log('info', msg['err_easy_login_install'])
+            import subprocess
+            try:
+                startupinfo = None
+                if sys.platform == 'win32':
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                # 메인 UI가 뜬 상태이므로 로그에 문구를 남기고 백그라운드 스레드에서 직접 설치를 진행합니다.
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "pywebview"],
+                    startupinfo=startupinfo
+                )
+                self.write_log('success', "성공적으로 필수 라이브러리(pywebview)가 설치되었습니다. 로그인을 기동합니다." if self.current_lang == 'ko' else "Successfully installed pywebview! Launching login window.")
+            except Exception as e:
+                self.write_log('error', f"필수 라이브러리 설치 실패: {e}\n명령창(cmd)에 'pip install pywebview'를 직접 실행해 주십시오." if self.current_lang == 'ko' else f"Failed to install library: {e}\nPlease run 'pip install pywebview' manually in your terminal.")
+                return
+
+        # 2. 본래의 간편 로그인 서브프로세스 기동
         self.write_log('info', msg['log_easy_login_start'])
         
         import subprocess
@@ -972,26 +995,6 @@ if __name__ == "__main__":
             import io
             sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
             sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-        except Exception:
-            pass
-
-    # 메인/서브 프로세스 구분 없이 구동 이전에 의존성 설치를 미리 확보합니다.
-    try:
-        import webview
-    except ImportError:
-        import subprocess
-        try:
-            # 윈도우 콘솔창 가림 속성 부여하여 pip 설치
-            startupinfo = None
-            if sys.platform == 'win32':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", "pywebview"],
-                startupinfo=startupinfo,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
         except Exception:
             pass
 
