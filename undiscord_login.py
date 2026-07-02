@@ -115,9 +115,9 @@ def run_login_window():
                         break
                 except Exception as ex:
                     # 페이지 리다이렉션 중 일시적인 자바스크립트 실행 예외는 무시하고 감시를 유지합니다.
-                    # 단, 창이 수동으로 완전히 닫힌 경우(Exception 메시지에 파괴/닫힘/ObjectDisposed 관련 문구 포함 시) 감시 루프를 즉각 탈출합니다.
+                    # 단, 창이 수동으로 완전히 닫힌 경우(Exception 메시지에 파괴/닫힘/ObjectDisposed/WebView2 관련 문구 포함 시) 감시 루프를 즉각 탈출합니다.
                     err_str = str(ex).lower()
-                    if window_closed[0] or any(x in err_str for x in ['close', 'destroy', 'null', 'object', 'access', 'denied', 'dispose', '삭제된', '개체']):
+                    if window_closed[0] or any(x in err_str for x in ['close', 'destroy', 'null', 'object', 'access', 'denied', 'dispose', 'disposed', 'webview', 'webview2', '삭제된', '개체']):
                         break
                     continue
 

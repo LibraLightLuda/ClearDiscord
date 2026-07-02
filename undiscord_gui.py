@@ -54,6 +54,11 @@ class UndiscordGUIApp:
     """
     def __init__(self, root):
         self.root = root
+        
+        # 메인 윈도우 스타일링 및 위젯 레이아웃 구성 도중 화면 깜빡임(잠깐 떴다 사라짐) 현상을
+        # 원천 방어하기 위해 초기화 진입 즉시 화면 상에서 완전히 보이지 않도록 숨깁니다.
+        self.root.withdraw()
+        
         self.root.geometry("1120x860")
         self.root.minsize(1080, 800)
         
@@ -96,8 +101,7 @@ class UndiscordGUIApp:
         self.setup_styles()
         self.create_widgets()
         
-        # 메인 창을 초기에 완전히 숨겨 비밀번호 인증을 통과하기 전까지 보이지 않도록 함
-        self.root.withdraw()
+        # (초기화 최상단에서 선제 숨김 처리 완료)
         
         # 로그 폴링 및 창 닫기 핸들러 바인딩
         self.root.after(100, self.poll_log_queue)
@@ -292,16 +296,39 @@ class UndiscordGUIApp:
                 self.root.after(0, lambda: self.set_extracted_token(token))
             else:
                 raw_log = "".join(full_output).strip()
-                if error_msg or raw_log:
-                    # 모든 에러 정보와 서브프로세스 출력 스택 트레이스를 로그창에 직접 출력
+                
+                # 단순히 사용자가 창을 닫아 발생한 WebView2 예외(ObjectDisposedException 등)인지 검사합니다.
+                is_minor_close_err = False
+                if raw_log:
+                    lower_log = raw_log.lower()
+                    # 닫기 동작 시 다국어로 발생 가능한 WebView2 객체 소멸 관련 키워드 정의
+                    close_keywords = ['objectdisposedexception', 'webview2', '삭제된 개체', 'accessing a disposed object']
+                    if any(k in lower_log for k in close_keywords):
+                        # 시스템 상 중대한 설치 실패(ImportError 등)나 권한 오류가 섞여있는지 역검사
+                        critical_keywords = ['importerror', 'modulenotfounderror', 'failed to install', 'permission denied']
+                        if not any(ck in lower_log for ck in critical_keywords):
+                            is_minor_close_err = True
+                            
+                    # 디스코드 보안 우회를 위한 User-Agent 설정 실패 메시지만 있는 무해한 경고의 경우도 필터링
+                    if "setting user agent failed" in lower_log and len(lower_log) < 150:
+                        is_minor_close_err = True
+
+                if error_msg or (raw_log and not is_minor_close_err):
+                    # 치명적이거나 식별되지 않은 프로세스 오류 스택 트레이스만 로그창에 에러로 남깁니다.
                     self.write_log('error', f"[Subprocess Log]\n{error_msg or raw_log}")
+                elif raw_log and is_minor_close_err:
+                    # 단순 창 종료로 인한 부차적인 로그는 메인 GUI 에러 로그에 붉은색으로 찍지 않고 백그라운드 콘솔로만 보존합니다.
+                    print(f"[Debug Subprocess Log]\n{raw_log}", flush=True)
+                    
                 self.write_log('warn', msg['log_easy_login_cancel'])
                 
         except Exception as e:
             err_trace = traceback.format_exc()
             self.write_log('error', msg['log_easy_login_err'].format(e=e))
             self.write_log('error', f"[Traceback Log]\n{err_trace}")
-            self.root.after(0, lambda: messagebox.showerror(msg['err_title'], msg['log_easy_login_err'].format(e=e)))
+            # 시스템에 적절한 WebView2 런타임이 없거나 초기화 예외 발생 시,
+            # 다중 브라우저 폴백(보안책) 대화상자를 즉각 트리거하여 크롬, 파이어폭스, 엣지 등을 선택할 수 있게 합니다.
+            self.root.after(0, lambda: self.show_browser_fallback_dialog(e))
 
     def set_extracted_token(self, token):
         """추출된 토큰을 복원 입력하고 마스터 비밀번호 저장을 트리거합니다."""
@@ -445,6 +472,208 @@ class UndiscordGUIApp:
                 self.root.after(300, self.root.destroy)
         else:
             self.root.destroy()
+
+    def show_browser_fallback_dialog(self, error):
+        """
+        WebView2 간편 로그인 창이 실패할 경우, 시스템에 설치된 실제 브라우저들(Chrome, Edge, Firefox)을 
+        감지하고 사용자가 선택하여 로그인 페이지를 열 수 있는 폴백(Fallback) 다이얼로그를 제공합니다.
+        """
+        # 다국어 처리 텍스트 정의
+        texts = {
+            'ko': {
+                'title': '로그인 브라우저 선택',
+                'desc_title': '간편 로그인 뷰어 실행에 실패했습니다.',
+                'desc_body': (
+                    'Windows에 WebView2 런타임(Edge Chromium 기반)이 설치되어 있지 않거나\n'
+                    '시스템 환경 상의 문제로 자동 뷰어 실행에 실패했습니다.\n\n'
+                    '대신 아래에 설치된 브라우저 중 하나를 선택해 로그인 페이지를 열 수 있습니다.\n'
+                    '로그인 후, 프로그램 안내에 따라 수동으로 인증 토큰을 복사하여 입력해 주세요.'
+                ),
+                'chrome_btn': 'Google Chrome으로 로그인',
+                'edge_btn': 'Microsoft Edge로 로그인',
+                'firefox_btn': 'Mozilla Firefox로 로그인',
+                'default_btn': '시스템 기본 브라우저로 로그인',
+                'btn_close': '닫기',
+                'not_installed': ' (미설치)'
+            },
+            'en': {
+                'title': 'Select Login Browser',
+                'desc_title': 'Failed to launch the easy login window.',
+                'desc_body': (
+                    'Microsoft WebView2 Runtime is not installed on this system\n'
+                    'or it failed to initialize due to environment limitations.\n\n'
+                    'Instead, you can choose one of your installed browsers to open the login page.\n'
+                    'After logging in, please follow the manual guide to copy/paste the authorization token.'
+                ),
+                'chrome_btn': 'Login with Google Chrome',
+                'edge_btn': 'Login with Microsoft Edge',
+                'firefox_btn': 'Login with Mozilla Firefox',
+                'default_btn': 'Login with Default Browser',
+                'btn_close': 'Close',
+                'not_installed': ' (Not Installed)'
+            }
+        }
+        
+        lang = self.current_lang if self.current_lang in ['ko', 'en'] else 'ko'
+        t = texts[lang]
+        
+        # 다이얼로그 윈도우 생성 (Tkinter Toplevel)
+        dialog = tk.Toplevel(self.root)
+        dialog.title(t['title'])
+        dialog.geometry("520x430")
+        dialog.resizable(False, False)
+        dialog.configure(bg=self.bg_dark)
+        
+        # 모달 윈도우 지정 및 부모 창과 상호작용 설정
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # 화면 중앙 배치 좌표 연산
+        dialog.update_idletasks()
+        parent_x = self.root.winfo_x()
+        parent_y = self.root.winfo_y()
+        parent_w = self.root.winfo_width()
+        parent_h = self.root.winfo_height()
+        
+        x = parent_x + (parent_w - 520) // 2
+        y = parent_y + (parent_h - 430) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # 상단 에러 상세 안내 레이블 영역 (디스코드 카드 형태 컨셉)
+        top_frame = tk.Frame(dialog, bg=self.bg_panel, bd=0, relief='flat')
+        top_frame.pack(fill='x', padx=15, pady=(15, 10))
+        
+        lbl_err_title = tk.Label(
+            top_frame, 
+            text=t['desc_title'], 
+            font=('Pretendard', 11, 'bold'),
+            fg=self.color_danger, 
+            bg=self.bg_panel,
+            anchor='w'
+        )
+        lbl_err_title.pack(fill='x', padx=15, pady=(12, 4))
+        
+        lbl_err_desc = tk.Label(
+            top_frame, 
+            text=t['desc_body'], 
+            font=('Pretendard', 9),
+            fg=self.fg_gray, 
+            bg=self.bg_panel,
+            justify='left',
+            anchor='w'
+        )
+        lbl_err_desc.pack(fill='x', padx=15, pady=(0, 12))
+        
+        # 시스템 브라우저 탐색 모듈 비동기 로딩
+        from undiscord_browser import get_available_browsers, launch_browser
+        available_browsers = get_available_browsers()
+        
+        # 버튼 영역 컨테이너
+        body_frame = tk.Frame(dialog, bg=self.bg_dark)
+        body_frame.pack(fill='both', expand=True, padx=15, pady=5)
+        
+        def handle_browser_click(browser_key):
+            # 브라우저 기동 후 다이얼로그 정리
+            launch_browser(browser_key)
+            dialog.destroy()
+            # 로그인 창이 뜸과 동시에 토큰 수동 획득 도움말(show_help_window)을 연계 호출하여 최적의 흐름 제공
+            self.show_help_window()
+            
+        # 1. Google Chrome 버튼 구성
+        chrome_installed = 'chrome' in available_browsers
+        chrome_text = t['chrome_btn'] if chrome_installed else t['chrome_btn'] + t['not_installed']
+        btn_chrome = tk.Button(
+            body_frame,
+            text=chrome_text,
+            font=('Pretendard', 9, 'bold' if chrome_installed else 'normal'),
+            fg=self.fg_white if chrome_installed else "#666666",
+            bg=self.color_accent if chrome_installed else "#2f3136",
+            activebackground=self.bg_input,
+            activeforeground=self.fg_white,
+            disabledforeground="#666666",
+            state='normal' if chrome_installed else 'disabled',
+            bd=0,
+            cursor='hand2' if chrome_installed else 'arrow',
+            height=2,
+            command=lambda: handle_browser_click('chrome')
+        )
+        btn_chrome.pack(fill='x', pady=4)
+        
+        # 2. Microsoft Edge 버튼 구성
+        edge_installed = 'msedge' in available_browsers
+        edge_text = t['edge_btn'] if edge_installed else t['edge_btn'] + t['not_installed']
+        btn_edge = tk.Button(
+            body_frame,
+            text=edge_text,
+            font=('Pretendard', 9, 'bold' if edge_installed else 'normal'),
+            fg=self.fg_white if edge_installed else "#666666",
+            bg=self.color_accent if edge_installed else "#2f3136",
+            activebackground=self.bg_input,
+            activeforeground=self.fg_white,
+            disabledforeground="#666666",
+            state='normal' if edge_installed else 'disabled',
+            bd=0,
+            cursor='hand2' if edge_installed else 'arrow',
+            height=2,
+            command=lambda: handle_browser_click('msedge')
+        )
+        btn_edge.pack(fill='x', pady=4)
+        
+        # 3. Mozilla Firefox 버튼 구성
+        firefox_installed = 'firefox' in available_browsers
+        firefox_text = t['firefox_btn'] if firefox_installed else t['firefox_btn'] + t['not_installed']
+        btn_firefox = tk.Button(
+            body_frame,
+            text=firefox_text,
+            font=('Pretendard', 9, 'bold' if firefox_installed else 'normal'),
+            fg=self.fg_white if firefox_installed else "#666666",
+            bg=self.color_accent if firefox_installed else "#2f3136",
+            activebackground=self.bg_input,
+            activeforeground=self.fg_white,
+            disabledforeground="#666666",
+            state='normal' if firefox_installed else 'disabled',
+            bd=0,
+            cursor='hand2' if firefox_installed else 'arrow',
+            height=2,
+            command=lambda: handle_browser_click('firefox')
+        )
+        btn_firefox.pack(fill='x', pady=4)
+        
+        # 4. 기본 웹 브라우저 폴백 버튼 구성 (기본 엣지/웨일/사파리 등 OS 설정 브라우저 기동)
+        btn_default = tk.Button(
+            body_frame,
+            text=t['default_btn'],
+            font=('Pretendard', 9),
+            fg=self.fg_white,
+            bg="#4f545c",
+            activebackground="#686d73",
+            activeforeground=self.fg_white,
+            bd=0,
+            cursor='hand2',
+            height=2,
+            command=lambda: handle_browser_click('default')
+        )
+        btn_default.pack(fill='x', pady=4)
+
+        # 닫기 단추가 위치할 하단 바
+        bottom_frame = tk.Frame(dialog, bg=self.bg_dark)
+        bottom_frame.pack(fill='x', side='bottom', padx=15, pady=15)
+        
+        btn_close = tk.Button(
+            bottom_frame,
+            text=t['btn_close'],
+            font=('Pretendard', 9),
+            fg=self.fg_white,
+            bg="#2f3136",
+            activebackground=self.bg_input,
+            activeforeground=self.fg_white,
+            bd=0,
+            cursor='hand2',
+            width=10,
+            height=1,
+            command=dialog.destroy
+        )
+        btn_close.pack(side='right')
 
     def show_help_window(self):
         """디스코드 인증키(토큰) 및 ID 식별자 획득 방법을 안내하는 고해상도 도움말 탭 윈도우를 구동합니다."""

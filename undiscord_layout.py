@@ -305,7 +305,8 @@ def create_widgets(app):
         cursor="hand2"
     )
     lbl_creator_link.grid(row=1, column=1, sticky="w", pady=(2, 0))
-    lbl_creator_link.bind("<Button-1>", lambda e: webbrowser.open_new_tab("https://discord.gg/lupeon"))
+    # 만든이 링크를 디스코드 채널 대신 깃허브 저장소 주소로 연결하도록 변경
+    lbl_creator_link.bind("<Button-1>", lambda e: webbrowser.open_new_tab("https://github.com/LibraLightLuda/ClearDiscord"))
     
     # 원본 GitHub 링크
     app.lbl_source_title = tk.Label(app.info_sub, text="  |  오픈소스: ", font=("Malgun Gothic", 8), fg=app.fg_gray, bg=app.bg_dark)
