@@ -466,31 +466,35 @@ class UndiscordGUIApp:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
+            # 교착 상태(Deadlock)를 방지하기 위해 stderr를 stdout으로 묶어서(STDOUT) 단일 파이프 스트림으로 관리합니다.
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8',
                 startupinfo=startupinfo
             )
             
             token = None
+            full_output = []
+            
+            # 실시간으로 출력을 전부 읽으며 버퍼 포화를 예방합니다.
             for line in iter(proc.stdout.readline, ''):
+                full_output.append(line)
                 if line.startswith("TOKEN:"):
                     token = line.strip().split("TOKEN:")[1]
                     break
-                    
-            # 남은 스트림 정리 및 에러 출력(stderr) 수집
-            _, stderr_output = proc.communicate()
+            
+            # 남은 스트림 비우기 및 자식 프로세스 완전 종료 대기
+            proc.wait()
             
             if token:
                 self.root.after(0, lambda: self.set_extracted_token(token))
             else:
-                stderr_output = stderr_output.strip() if stderr_output else ""
-                if stderr_output:
-                    # 다국어 대응 에러 메시지 출력
-                    self.write_log('error', f"[Subprocess Error] {stderr_output}")
+                err_text = "".join(full_output).strip()
+                if err_text:
+                    self.write_log('error', f"[Subprocess Log]\n{err_text}")
                 self.write_log('warn', msg['log_easy_login_cancel'])
                 
         except Exception as e:
@@ -968,6 +972,26 @@ if __name__ == "__main__":
             import io
             sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
             sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+        except Exception:
+            pass
+
+    # 메인/서브 프로세스 구분 없이 구동 이전에 의존성 설치를 미리 확보합니다.
+    try:
+        import webview
+    except ImportError:
+        import subprocess
+        try:
+            # 윈도우 콘솔창 가림 속성 부여하여 pip 설치
+            startupinfo = None
+            if sys.platform == 'win32':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "pywebview"],
+                startupinfo=startupinfo,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
         except Exception:
             pass
 
