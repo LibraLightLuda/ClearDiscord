@@ -41,7 +41,6 @@ def restore_token_session(app, data):
                 mode="enter",
                 lang=app.current_lang
             )
-            app.root.wait_window(dlg)
             
             if dlg.result is not None:
                 if dlg.result == "":
@@ -106,7 +105,6 @@ def restore_token_session(app, data):
         # 최초 실행 등으로 인해 비밀번호 정보가 아예 저장되지 않은 경우 실행 시 우선 설정하도록 강제
         app.write_log('info', msg['log_pass_no_exist'])
         dlg = PasswordDialog(app.root, mode="set", lang=app.current_lang)
-        app.root.wait_window(dlg)
         
         if dlg.result is not None:
             if dlg.result == "":
