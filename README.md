@@ -13,9 +13,11 @@
 이 프로그램은 **내가 지우고 싶은 방을 지정해서 내가 썼던 글들을 자동으로 빠르게 지워주는 청소기**입니다.
 
 > [!WARNING]
-> **⚠️ 꼭 읽어주세요! (주의사항)**
-> *   디스코드는 기계(프로그램)를 이용해 글을 대량으로 빠르게 지우는 행위를 공식적으로 권장하지 않습니다.
-> *   너무 짧은 시간 동안 많은 글을 연속으로 지우면 계정이 일시 정지되거나 잠길 수 있습니다. 프로그램에서 기본으로 정해주는 안전 대기 시간(1.5초~3초)을 그대로 사용하시는 것을 강력히 권장합니다.
+> **⚠️ 꼭 읽어주세요! (보안 경고 및 사용자 책임)**
+> *   **⚠️ 토큰 노출 금지:** 로그인 열쇠(인증 토큰)는 계정의 비밀번호와 같은 역할을 합니다. **절대 다른 사람에게 공유하거나 스크린샷 등으로 노출하지 마세요.** 토큰이 유출되면 타인이 내 계정을 완전히 지배할 수 있게 됩니다. (혹시라도 유출되었을 경우 즉시 디스코드 비밀번호를 변경하여 기존 토큰을 무효화해야 합니다.)
+> *   **🚫 계정 정지 위험:** 디스코드는 자동화 도구(셀프봇 등)의 사용을 공식적으로 금지하고 있습니다. 이 프로그램의 사용으로 인해 디스코드 계정이 영구/일시 정지되거나 제한될 수 있습니다.
+> *   **⚖️ 사용자 책임 명시 (Disclaimer):** 이 프로그램을 사용함으로써 발생하는 모든 결과와 손실(계정 정지, 토큰 유출, 데이터 삭제 등)에 대한 책임은 **전적으로 프로그램을 실행한 사용자 본인**에게 있습니다. 개발자는 어떠한 상황에서도 이에 대한 책임을 지지 않습니다. 동의하시는 경우에만 사용해 주십시오.
+> *   **💡 권장 사항:** 너무 짧은 시간 동안 많은 글을 연속으로 지우면 감지될 확률이 높습니다. 기본 안전 대기 시간(1.5초~3초)을 유지하시는 것을 강력히 권장합니다.
 
 ---
 
@@ -72,9 +74,11 @@ When you use Discord a lot, you might want to delete all your past comments or p
 This program is an **automated Discord message cleaner** that quickly finds and deletes only the messages you wrote in a specific channel or direct message (DM) room.
 
 > [!WARNING]
-> **⚠️ Please Read! (Warnings)**
-> *   Discord does not officially support the use of automated tools (self-bots) to delete messages.
-> *   Deleting messages too fast can result in temporary or permanent account restrictions. We highly recommend using the default safe delay settings (1.5 to 3 seconds) provided by the app.
+> **⚠️ Please Read! (Security Warning & Disclaimer)**
+> *   **⚠️ Never Share Your Token:** Your authentication token acts as a master key to your account. **Do not share your token or expose it in screenshots/public spaces.** Anyone with access to your token can take full control of your account. (If your token is accidentally leaked, change your Discord password immediately to invalidate it.)
+> *   **🚫 Risk of Account Termination:** Discord officially forbids the use of automation tools (self-bots). Using this tool could result in temporary or permanent restriction/suspension of your Discord account.
+> *   **⚖️ Disclaimer (Use at Your Own Risk):** You are fully responsible for any actions taken and consequences arising from the use of this tool (including account termination, token leak, or data deletion). The developers assume no liability or responsibility for any damages. Use this tool at your own risk.
+> *   **💡 Recommendations:** Attempting to delete messages too quickly increases detection risks. We highly recommend keeping the default safe delay settings (1.5 to 3 seconds).
 
 ---
 
