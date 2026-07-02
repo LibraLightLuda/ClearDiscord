@@ -37,6 +37,72 @@ from undiscord_i18n import get_system_language, MESSAGES
 __all__ = ['UndiscordCore', 'PasswordDialog', 'to_snowflake', 'ms_to_hms']
 
 
+def run_login_window():
+    """pywebview를 사용하여 디스코드 로그인 페이지를 띄우고 토큰을 자동 추출합니다."""
+    import time
+    import threading
+    
+    try:
+        import webview
+    except ImportError:
+        # pywebview 자동 설치 시도
+        import subprocess
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pywebview"])
+            import webview
+        except Exception as e:
+            print(f"ERROR: pywebview installation failed. {e}", file=sys.stderr)
+            sys.exit(1)
+    
+    token_found = [None]
+    
+    def check_token(window):
+        # 디스코드 웹 클라이언트에서 토큰을 추출하는 Webpack 청크 우회 자바스크립트
+        js_code = """
+        (function() {
+            try {
+                return (window.webpackChunkdiscord_app.push([
+                    [Math.random()],
+                    {},
+                    (req) => {
+                        for (const m of Object.keys(req.c).map((x) => req.c[x].exports)) {
+                            if (m && m.default && m.default.getToken !== undefined) {
+                                return m.default.getToken();
+                            }
+                        }
+                    }
+                ]));
+            } catch (e) {
+                return null;
+            }
+        })()
+        """
+        while True:
+            try:
+                time.sleep(0.5)
+                res = window.evaluate_js(js_code)
+                if res and isinstance(res, str) and len(res.strip()) > 30:
+                    token_found[0] = res.strip()
+                    print(f"TOKEN:{token_found[0]}", flush=True)
+                    window.destroy()
+                    break
+            except Exception:
+                break
+
+    window = webview.create_window(
+        title="Discord Easy Login",
+        url="https://discord.com/login",
+        width=500,
+        height=680,
+        resizable=True
+    )
+    
+    t = threading.Thread(target=check_token, args=(window,), daemon=True)
+    t.start()
+    
+    webview.start()
+
+
 class UndiscordGUIApp:
     """
     디스코드 스타일의 2x2 격자형 대시보드 레이아웃을 통해
@@ -377,6 +443,67 @@ class UndiscordGUIApp:
         else:
             self.entry_token.configure(show="*")
             self.btn_toggle_token.configure(text=msg['btn_view'])
+
+    def launch_auto_login(self):
+        """간편 로그인 서브프로세스를 기동하여 토큰 자동 입력을 수행합니다."""
+        threading.Thread(target=self._auto_login_thread_func, daemon=True).start()
+
+    def _auto_login_thread_func(self):
+        msg = MESSAGES[self.current_lang]
+        self.write_log('info', msg['log_easy_login_start'])
+        
+        import subprocess
+        if getattr(sys, 'frozen', False):
+            cmd = [sys.executable, "--login"]
+        else:
+            # sys.argv[0] 대신 실제 모듈의 절대 경로(__file__)를 명시적으로 기입하여 실행 안정성을 확보합니다.
+            script_path = os.path.abspath(__file__)
+            cmd = [sys.executable, script_path, "--login"]
+            
+        try:
+            startupinfo = None
+            if sys.platform == 'win32':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo
+            )
+            
+            token = None
+            for line in iter(proc.stdout.readline, ''):
+                if line.startswith("TOKEN:"):
+                    token = line.strip().split("TOKEN:")[1]
+                    break
+                    
+            # 남은 스트림 정리 및 에러 출력(stderr) 수집
+            _, stderr_output = proc.communicate()
+            
+            if token:
+                self.root.after(0, lambda: self.set_extracted_token(token))
+            else:
+                stderr_output = stderr_output.strip() if stderr_output else ""
+                if stderr_output:
+                    # 다국어 대응 에러 메시지 출력
+                    self.write_log('error', f"[Subprocess Error] {stderr_output}")
+                self.write_log('warn', msg['log_easy_login_cancel'])
+                
+        except Exception as e:
+            self.write_log('error', msg['log_easy_login_err'].format(e=e))
+            self.root.after(0, lambda: messagebox.showerror(msg['err_title'], msg['log_easy_login_err'].format(e=e)))
+
+    def set_extracted_token(self, token):
+        """추출된 토큰을 복원 입력하고 마스터 비밀번호 저장을 트리거합니다."""
+        msg = MESSAGES[self.current_lang]
+        self.var_token.set(token)
+        self.write_log('success', msg['log_easy_login_success'])
+        messagebox.showinfo(msg['ok'], msg['log_easy_login_success'])
+        self.on_token_focus_out()  # 토큰 세션 암호화 저장 트리거
 
     def click_clear_log(self):
         self.log_area.delete("1.0", tk.END)
@@ -843,6 +970,11 @@ if __name__ == "__main__":
             sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
         except Exception:
             pass
+
+    # 간편 로그인 모듈 기동 인자 검증
+    if len(sys.argv) > 1 and sys.argv[1] == '--login':
+        run_login_window()
+        sys.exit(0)
 
     try:
         import ctypes

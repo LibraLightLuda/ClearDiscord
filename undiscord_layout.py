@@ -81,6 +81,9 @@ def create_widgets(app):
     
     app.btn_toggle_token = ttk.Button(token_sub, text="보기", width=5, style='Normal.TButton', command=app.toggle_token_visibility)
     app.btn_toggle_token.grid(row=0, column=1, padx=(5, 0), sticky="e")
+    
+    app.btn_easy_login = ttk.Button(token_sub, text="간편 로그인", width=12, style='Normal.TButton', command=app.launch_auto_login)
+    app.btn_easy_login.grid(row=0, column=2, padx=(5, 0), sticky="e")
 
     # 암호화 상태 표시 라벨
     app.lbl_crypto_status = ttk.Label(app.card1, text="", style='Card.TLabel')
@@ -389,6 +392,8 @@ def update_ui_texts(app):
         app.btn_toggle_token.configure(text=msg['btn_view'])
     else:
         app.btn_toggle_token.configure(text=msg['btn_hide'])
+        
+    app.btn_easy_login.configure(text=msg['btn_easy_login'])
         
     # 카드 2: 위치 및 범위
     app.lbl_guild.configure(text=msg['guild_id_label'])

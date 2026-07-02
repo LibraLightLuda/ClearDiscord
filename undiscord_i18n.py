@@ -48,6 +48,7 @@ MESSAGES = {
         'token_label': "디스코드 인증 토큰 *",
         'btn_view': "보기",
         'btn_hide': "숨기기",
+        'btn_easy_login': "간편 로그인",
         'author_id_label': "작성자 ID (미입력 시 내 계정으로 자동 기입)",
         
         # 카드 2: 위치 및 범위
@@ -146,6 +147,11 @@ MESSAGES = {
         'err_fetch_failed': "목록 로드 실패: {e}",
         
         # 로그 출력 메시지
+        'log_easy_login_start': "디스코드 간편 로그인 창을 실행합니다. 브라우저에서 로그인을 완료하면 토큰이 자동으로 입력됩니다.",
+        'log_easy_login_success': "성공적으로 로그인 토큰을 가져왔습니다!",
+        'log_easy_login_cancel': "디스코드 간편 로그인이 완료되지 않았거나 취소되었습니다.",
+        'log_easy_login_err': "간편 로그인 실행 실패: {e}",
+        'err_easy_login_install': "간편 로그인 기능을 실행하려면 'pywebview' 라이브러리가 필요합니다. 자동 설치 중...",
         'log_search_author': "작성자 ID가 입력되지 않아 디스코드 인증 토큰의 본인 고유 계정 ID를 조회합니다...",
         'log_author_auto_set': "본인 계정 ID를 자동으로 불러와 적용했습니다: {my_id}",
         'log_author_fail': "본인 계정 ID 자동 조회 실패 (응답 코드: {status}). 전체 메시지 기준으로 검색 및 삭제가 수행될 수 있습니다.",
@@ -276,6 +282,7 @@ MESSAGES = {
         'token_label': "Discord Auth Token *",
         'btn_view': "Show",
         'btn_hide': "Hide",
+        'btn_easy_login': "Easy Login",
         'author_id_label': "Author ID (Leave blank to auto-fetch your ID)",
         
         # Card 2: Target & Range
@@ -374,6 +381,11 @@ MESSAGES = {
         'err_fetch_failed': "Failed to fetch server/channel list: {e}",
         
         # Log Messages
+        'log_easy_login_start': "Launching Discord easy login window. Log in to automatically extract your token.",
+        'log_easy_login_success': "Successfully extracted login token!",
+        'log_easy_login_cancel': "Discord easy login was not completed or was cancelled.",
+        'log_easy_login_err': "Failed to launch easy login: {e}",
+        'err_easy_login_install': "The 'pywebview' library is required for easy login. Installing automatically...",
         'log_search_author': "Author ID was not provided. Querying account details for your user ID...",
         'log_author_auto_set': "Automatically fetched and applied your account ID: {my_id}",
         'log_author_fail': "Failed to auto-fetch account ID (Status: {status}). Deletion will run based on all authors.",
