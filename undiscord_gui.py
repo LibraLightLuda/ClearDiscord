@@ -67,10 +67,22 @@ def run_login_window():
             print(f"DEBUG: Setting user agent failed: {e}", flush=True)
         
         def check_token(window):
-            # 디스코드 웹 클라이언트에서 토큰을 추출하는 Webpack 청크 우회 자바스크립트
+            # 디스코드 웹 세션 토큰 추출을 위한 복합 JS (iframe LocalStorage 우회 및 Webpack Chunk 듀얼 감지)
             js_code = """
             (function() {
                 try {
+                    // 기법 1: iframe 생성을 통한 localStorage.token 우회 탈취
+                    let iframe = document.createElement('iframe');
+                    document.head.append(iframe);
+                    let token = iframe.contentWindow.localStorage.token;
+                    iframe.remove();
+                    if (token) {
+                        return token.replace(/"/g, '');
+                    }
+                } catch (e) {}
+                
+                try {
+                    // 기법 2: Webpack Chunk Injection 방식
                     return (window.webpackChunkdiscord_app.push([
                         [Math.random()],
                         {},
@@ -82,9 +94,9 @@ def run_login_window():
                             }
                         }
                     ]));
-                } catch (e) {
-                    return null;
-                }
+                } catch (e) {}
+                
+                return null;
             })()
             """
             while True:
@@ -96,8 +108,13 @@ def run_login_window():
                         print(f"TOKEN:{token_found[0]}", flush=True)
                         window.destroy()
                         break
-                except Exception:
-                    break
+                except Exception as ex:
+                    # 페이지 리다이렉션 중 일시적인 자바스크립트 실행 예외는 무시하고 감시를 유지합니다.
+                    # 단, 창이 수동으로 완전히 닫힌 경우(Exception 메시지에 파괴/닫힘 관련 문구 포함 시) 감시 루프를 탈출합니다.
+                    err_str = str(ex).lower()
+                    if any(x in err_str for x in ['close', 'destroy', 'null', 'object', 'access', 'denied']):
+                        break
+                    continue
 
         # 반응형 레이아웃 대응 및 QR코드 로그인 영역이 숨겨지지 않도록 창 크기를 가로로 충분히 확장합니다. (width=1000)
         window = webview.create_window(
