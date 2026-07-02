@@ -56,6 +56,12 @@ def run_login_window():
     
     token_found = [None]
     
+    # 디스코드 보안 차단(reCAPTCHA / Cloudflare) 우회를 위한 최신 Chrome 브라우저 User-Agent 위장
+    try:
+        webview.settings['USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    except Exception:
+        pass
+    
     def check_token(window):
         # 디스코드 웹 클라이언트에서 토큰을 추출하는 Webpack 청크 우회 자바스크립트
         js_code = """
@@ -89,6 +95,7 @@ def run_login_window():
             except Exception:
                 break
 
+    # 모던 스크립트 실행 불가로 인한 Blank screen 버그 방지를 위해 Edge Chromium (WebView2) 브라우저 엔진을 강제 지정합니다.
     window = webview.create_window(
         title="Discord Easy Login",
         url="https://discord.com/login",
@@ -97,10 +104,15 @@ def run_login_window():
         resizable=True
     )
     
-    t = threading.Thread(target=check_token, args=(window,), daemon=True)
-    t.start()
+    # 렌더러 로딩 완료 이전 evaluate_js 호출로 인한 교착 상태 및 프리징 방지를 위해 loaded 이벤트 시점에 스레드 구동
+    def on_loaded():
+        t = threading.Thread(target=check_token, args=(window,), daemon=True)
+        t.start()
+        
+    window.events.loaded += on_loaded
     
-    webview.start()
+    # Windows OS에서 WebView2(Chromium) 런타임 구동을 지시합니다. (없을 시 예외가 발생하여 사용자에게 에러 로그 노출)
+    webview.start(gui='edgechromium')
 
 
 class UndiscordGUIApp:
