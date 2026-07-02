@@ -99,12 +99,12 @@ def run_login_window():
                 except Exception:
                     break
 
-        # 모던 스크립트 실행 불가로 인한 Blank screen 버그 방지를 위해 Edge Chromium (WebView2) 브라우저 엔진을 강제 지정합니다.
+        # 반응형 레이아웃 대응 및 QR코드 로그인 영역이 숨겨지지 않도록 창 크기를 가로로 충분히 확장합니다. (width=1000)
         window = webview.create_window(
             title="Discord Easy Login",
             url="https://discord.com/login",
-            width=500,
-            height=680,
+            width=1000,
+            height=700,
             resizable=True
         )
         
