@@ -142,3 +142,20 @@ def resource_path(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
+# ==================================================
+# 로그 마스킹 처리를 위한 하위 호환성 문자열 클래스
+# ==================================================
+
+class LogString(str):
+    """
+    일반 문자열(str)을 상속받으면서도 추가적인 메타데이터(extra)를 보존하는 특수 문자열 클래스입니다.
+    이를 통해 기존 CLI 환경 및 모킹(Mock) 테스트 코드와의 하위 호환성을 100% 유지하면서,
+    GUI 단에서 실시간 마스킹 토글이 가능하도록 원본 로그 데이터를 전달합니다.
+    """
+    def __new__(cls, value, extra=None):
+        obj = super().__new__(cls, value)
+        obj.extra = extra
+        return obj
+
+
+

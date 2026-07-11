@@ -23,7 +23,8 @@ from undiscord_utils import (
     to_snowflake, 
     calculate_relative_date, 
     validate_discord_url,
-    resource_path
+    resource_path,
+    LogString
 )
 from undiscord_crypto import (
     encrypt_data, 
@@ -59,8 +60,8 @@ class UndiscordGUIApp:
         # 원천 방어하기 위해 초기화 진입 즉시 화면 상에서 완전히 보이지 않도록 숨깁니다.
         self.root.withdraw()
         
-        self.root.geometry("1120x860")
-        self.root.minsize(1080, 800)
+        self.root.geometry("1160x920")
+        self.root.minsize(1120, 850)
         
         # 타이틀바 및 작업표시줄 아이콘 설정 (PyInstaller 리소스 패키징 경로 추적)
         try:
@@ -75,6 +76,7 @@ class UndiscordGUIApp:
             print(f"아이콘 로딩 실패: {e}")
         
         self.log_queue = queue.Queue()
+        self.log_history = []
         self.engine = None
         self.engine_thread = None
         
@@ -102,6 +104,9 @@ class UndiscordGUIApp:
         # UI 스타일시트 및 레이아웃 생성
         self.setup_styles()
         self.create_widgets()
+        self._updating_from_event = False
+        self.var_guild_id.trace_add("write", self._on_guild_id_write)
+        self.var_channel_id.trace_add("write", self._on_channel_id_write)
         
         # (초기화 최상단에서 선제 숨김 처리 완료)
         
@@ -383,28 +388,81 @@ class UndiscordGUIApp:
 
     def click_clear_log(self):
         self.log_area.delete("1.0", tk.END)
+        self.log_history.clear()
 
     def write_log(self, log_type, text):
         now_time = datetime.now().strftime("%H:%M:%S")
-        prefix = f"[{now_time}] "
-        self.log_area.insert(tk.END, prefix, 'verb')
-        self.log_area.insert(tk.END, text + "\n", log_type)
         
-        # 로그가 너무 많이 쌓여 메모리를 지나치게 점유하거나 GUI 렌더링이 느려지는 현상을 방지하기 위해,
-        # 최대 1000줄까지만 로그를 보존하고 오래된 로그 메시지는 자동으로 삭제하도록 제한합니다.
+        # LogString 객체인지 판단하여 메타데이터가 있으면 메시지 삭제 로그로 처리
+        is_msg_delete = isinstance(text, LogString) and text.extra is not None and text.extra.get('type') == 'message_delete'
+        
+        if is_msg_delete:
+            log_item = {
+                'log_type': log_type,
+                'now_time': now_time,
+                'is_msg_delete': True,
+                'data': text.extra
+            }
+        else:
+            log_item = {
+                'log_type': log_type,
+                'now_time': now_time,
+                'is_msg_delete': False,
+                'text': str(text)
+            }
+            
+        self.log_history.append(log_item)
+        
+        # UI에 실제로 삽입
+        self.insert_log_to_ui(log_item)
+        
+        # 로그 보존 1000줄 제한 및 log_history 관리
         try:
-            # 'end-1c' 인덱스에서 줄 번호를 파악하여 현재 총 라인 수를 구합니다.
             total_lines = int(self.log_area.index('end-1c').split('.')[0])
             max_lines = 1000
             if total_lines > max_lines:
-                # 보존할 개수를 초과한 오래된 앞줄 부분을 삭제합니다.
-                # (1.0 라인부터 초과분+1.0 라인 직전까지 일괄 제거)
                 delete_count = total_lines - max_lines
                 self.log_area.delete("1.0", f"{delete_count + 1}.0")
+                # log_history 에서도 앞에서부터 동일한 개수만큼 삭제하여 메모리 관리
+                if len(self.log_history) > max_lines:
+                    self.log_history = self.log_history[-max_lines:]
         except Exception as e:
-            # 자동 로그 정리 중 혹여 예외가 발생하더라도 작업이 정상 진행되도록 예외 처리합니다.
             print(f"[Warn] 로그 정리 실패: {e}")
             
+        self.log_area.see(tk.END)
+
+    def insert_log_to_ui(self, log_item):
+        """단일 로그 아이템의 현재 마스킹 상태를 반영하여 로그 창에 삽입합니다."""
+        prefix = f"[{log_item['now_time']}] "
+        self.log_area.insert(tk.END, prefix, 'verb')
+        
+        if log_item['is_msg_delete']:
+            data = log_item['data']
+            mask_active = self.var_mask_chat_log.get()
+            
+            if mask_active:
+                content_preview = "●●● (마스킹됨)"
+            else:
+                content = data['content']
+                content_preview = f"{content[:40]}..." if len(content) > 40 else content
+                
+            info_text = MESSAGES[self.current_lang]['log_engine_info_fmt'].format(
+                del_count=data['del_count'],
+                total=data['total'],
+                time=data['time'],
+                username=data['username'],
+                content=content_preview,
+                id=data['id']
+            )
+            self.log_area.insert(tk.END, info_text + "\n", log_item['log_type'])
+        else:
+            self.log_area.insert(tk.END, log_item['text'] + "\n", log_item['log_type'])
+
+    def redraw_logs(self):
+        """마스킹 설정 변경 등으로 인해 로그창을 즉각적으로 완전히 다시 그립니다."""
+        self.log_area.delete("1.0", tk.END)
+        for log_item in self.log_history:
+            self.insert_log_to_ui(log_item)
         self.log_area.see(tk.END)
 
     def click_start(self):
@@ -924,10 +982,21 @@ class UndiscordGUIApp:
             self.guilds_map[g_id] = display_name
             self.guilds_map[display_name] = g_id
 
+        # 이전에 저장된 서버 ID가 목록에 존재하면 해당 항목을 자동으로 가리킵니다.
+        saved_guild_id = self.var_guild_id.get()
+        matched_idx = 0
+        if saved_guild_id:
+            if saved_guild_id == "@me":
+                matched_idx = 0
+            else:
+                matched_display = self.guilds_map.get(saved_guild_id)
+                if matched_display in values:
+                    matched_idx = values.index(matched_display)
+
         self.combo_guilds.configure(values=values)
-        self.combo_guilds.current(0)
+        self.combo_guilds.current(matched_idx)
         
-        # 기본적으로 첫 번째(DM) 선택 유도
+        # 선택된 서버에 따른 채널 목록 자동 로드 유도
         self.on_guild_combo_select(None)
 
     def _load_guilds_fail(self, err_msg):
@@ -954,7 +1023,11 @@ class UndiscordGUIApp:
         if not guild_id:
             return
 
-        self.var_guild_id.set(guild_id)
+        self._updating_from_event = True
+        try:
+            self.var_guild_id.set(guild_id)
+        finally:
+            self._updating_from_event = False
         self.load_channels_async(guild_id)
 
     def load_channels_async(self, guild_id):
@@ -987,7 +1060,13 @@ class UndiscordGUIApp:
 
         if guild_id == "@me":
             # 개인 DM 채널들
-            for c in channels:
+            # 가장 최근에 dm이 오간 순서대로 정렬 (last_message_id 내림차순, 없는 경우 가장 뒤로)
+            sorted_channels = sorted(
+                channels,
+                key=lambda x: int(x.get('last_message_id') or 0),
+                reverse=True
+            )
+            for c in sorted_channels:
                 c_id = c.get('id', '')
                 c_type = c.get('type', 1)
                 
@@ -1032,8 +1111,22 @@ class UndiscordGUIApp:
             self.combo_channels.configure(values=values)
             self.combo_channels.set(msg['combo_channel_placeholder'])
         else:
+            # 이전에 저장된 채널 ID가 목록에 존재하면 해당 항목을 자동으로 가리킵니다.
+            saved_channel_id = self.var_channel_id.get()
+            matched_channel_idx = 0
+            if saved_channel_id:
+                # 다중 채널이 쉼표로 나열된 경우 첫 번째 채널을 대표로 매핑 매칭 시도
+                primary_channel_id = saved_channel_id.split(",")[0].strip()
+                matched_display = None
+                for disp_name, c_id in self.channels_map.items():
+                    if c_id == primary_channel_id:
+                        matched_display = disp_name
+                        break
+                if matched_display in values:
+                    matched_channel_idx = values.index(matched_display)
+
             self.combo_channels.configure(values=values)
-            self.combo_channels.current(0)
+            self.combo_channels.current(matched_channel_idx)
             self.on_channel_combo_select(None)
 
     def _load_channels_fail(self, err_msg):
@@ -1051,7 +1144,55 @@ class UndiscordGUIApp:
         
         channel_id = self.channels_map.get(val, "")
         if channel_id:
-            self.var_channel_id.set(channel_id)
+            self._updating_from_event = True
+            try:
+                self.var_channel_id.set(channel_id)
+            finally:
+                self._updating_from_event = False
+
+    def _on_guild_id_write(self, *args):
+        """서버 ID 텍스트 필드의 값이 수동으로 입력되거나 변경될 때 호출됩니다."""
+        if getattr(self, '_updating_from_event', False):
+            return
+
+        guild_id = self.var_guild_id.get().strip()
+        if not guild_id:
+            return
+
+        display_name = self.guilds_map.get(guild_id)
+        if display_name:
+            values = list(self.combo_guilds['values'])
+            if display_name in values:
+                idx = values.index(display_name)
+                if self.combo_guilds.current() != idx:
+                    self.combo_guilds.current(idx)
+                    # 수동 입력으로 콤보박스가 매칭된 경우, 채널 목록도 자동으로 비동기 로딩을 개시합니다.
+                    self.load_channels_async(guild_id)
+
+    def _on_channel_id_write(self, *args):
+        """채널 ID 텍스트 필드의 값이 수동으로 입력되거나 변경될 때 호출됩니다."""
+        if getattr(self, '_updating_from_event', False):
+            return
+
+        channel_id = self.var_channel_id.get().strip()
+        if not channel_id:
+            return
+
+        # 쉼표로 다중 채널이 나열된 경우 첫 번째 채널을 대표로 매칭 시도
+        primary_channel_id = channel_id.split(",")[0].strip()
+
+        matched_display = None
+        for disp_name, c_id in self.channels_map.items():
+            if c_id == primary_channel_id:
+                matched_display = disp_name
+                break
+
+        if matched_display:
+            values = list(self.combo_channels['values'])
+            if matched_display in values:
+                idx = values.index(matched_display)
+                if self.combo_channels.current() != idx:
+                    self.combo_channels.current(idx)
 
 
 # ==========================================

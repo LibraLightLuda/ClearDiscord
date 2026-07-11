@@ -485,5 +485,14 @@ def update_checkbox_ux(app):
         # 5. 로그 내 채팅 내용 마스킹
         mask_chat_log_text = f"{status_active if app.var_mask_chat_log.get() else status_inactive}{msg.get('chk_mask_chat_log', '로그에 내 채팅 내용 마스킹')}"
         app.chk_mask_chat_log.configure(text=mask_chat_log_text)
+        
+        # 마스킹 여부가 실제로 변경되었을 때만 로그창을 갱신합니다.
+        current_mask_val = app.var_mask_chat_log.get()
+        if not hasattr(app, '_last_mask_chat_log_val') or app._last_mask_chat_log_val != current_mask_val:
+            app._last_mask_chat_log_val = current_mask_val
+            if app.engine:
+                app.engine.options['maskChatLog'] = current_mask_val
+            if hasattr(app, 'log_history') and hasattr(app, 'redraw_logs'):
+                app.redraw_logs()
     except Exception as e:
         print(f"체크박스 UX 업데이트 에러: {e}")

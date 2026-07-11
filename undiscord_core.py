@@ -12,7 +12,7 @@ from curl_cffi import requests
 import base64
 import json
 from datetime import datetime
-from undiscord_utils import ms_to_hms, to_snowflake, validate_discord_url
+from undiscord_utils import ms_to_hms, to_snowflake, validate_discord_url, LogString
 from undiscord_i18n import MESSAGES
 
 class UndiscordCore:
@@ -391,7 +391,17 @@ class UndiscordCore:
                 content=content_preview,
                 id=msg_id
             )
-            self.log('info', info_text)
+            # GUI 단에서 실시간 마스킹 토글을 즉각 반영하기 위해 원본 데이터를 포함한 LogString 객체로 감싸 전달합니다.
+            log_obj = LogString(info_text, extra={
+                'type': 'message_delete',
+                'del_count': self.state['delCount'] + 1,
+                'total': self.state['grandTotal'],
+                'time': msg_time,
+                'username': username,
+                'content': content,
+                'id': msg_id
+            })
+            self.log('info', log_obj)
 
             attempt = 0
             max_attempt = self.options.get('maxAttempt', 2)
