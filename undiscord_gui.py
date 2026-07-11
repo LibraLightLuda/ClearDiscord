@@ -80,6 +80,8 @@ class UndiscordGUIApp:
         
         # 보안 토큰 암호화 세션 패스워드 캐싱 변수
         self.session_password = None
+        self.session_token = ""
+        self.token_visible = False
         self.guilds_map = {}
         self.channels_map = {}
 
@@ -149,7 +151,24 @@ class UndiscordGUIApp:
             self.var_max_range.set(val)
 
     def on_token_focus_out(self, event=None):
-        token_plain = self.var_token.get().strip()
+        raw_val = self.var_token.get().strip()
+        
+        # 만약 마스킹 문자열이면 변경이 없는 것이므로 유지
+        if raw_val and all(c == '•' for c in raw_val):
+            return
+            
+        token_plain = raw_val
+        self.session_token = token_plain
+        
+        if token_plain:
+            self.var_token.set("••••••••••••••••")
+            self.token_visible = False
+            self.entry_token.configure(show="*")
+            msg = MESSAGES[self.current_lang]
+            self.btn_toggle_token.configure(text=msg['btn_view'])
+        else:
+            self.session_token = ""
+            
         msg = MESSAGES[self.current_lang]
         if not token_plain:
             return
@@ -177,12 +196,16 @@ class UndiscordGUIApp:
 
     def toggle_token_visibility(self):
         msg = MESSAGES[self.current_lang]
-        if self.entry_token.cget("show") == "*":
-            self.entry_token.configure(show="")
-            self.btn_toggle_token.configure(text=msg['btn_hide'])
-        else:
+        if self.token_visible:
+            self.var_token.set("••••••••••••••••")
             self.entry_token.configure(show="*")
             self.btn_toggle_token.configure(text=msg['btn_view'])
+            self.token_visible = False
+        else:
+            self.var_token.set(self.session_token)
+            self.entry_token.configure(show="")
+            self.btn_toggle_token.configure(text=msg['btn_hide'])
+            self.token_visible = True
 
     def launch_auto_login(self):
         """간편 로그인 서브프로세스를 기동하여 토큰 자동 입력을 수행합니다."""
@@ -276,8 +299,8 @@ class UndiscordGUIApp:
                         error_msg = f"ERROR: IPC decryption failed: {e}"
                     break
                 elif line.startswith("TOKEN:"):
-                    # 평문 폴백 (하위 호환)
-                    token = line.strip().split("TOKEN:")[1]
+                    # 평문 전송은 보안상 허용하지 않음
+                    error_msg = "ERROR: Plaintext token received from child process, which is blocked for security reasons."
                     break
                 elif line.startswith("ERROR:"):
                     error_msg = line.strip()
@@ -333,7 +356,12 @@ class UndiscordGUIApp:
     def set_extracted_token(self, token):
         """추출된 토큰을 복원 입력하고 마스터 비밀번호 저장을 트리거합니다."""
         msg = MESSAGES[self.current_lang]
-        self.var_token.set(token)
+        self.session_token = token
+        self.var_token.set("••••••••••••••••")
+        self.token_visible = False
+        self.entry_token.configure(show="*")
+        self.btn_toggle_token.configure(text=msg['btn_view'])
+        
         self.write_log('success', msg['log_easy_login_success'])
         messagebox.showinfo(msg['ok'], msg['log_easy_login_success'])
         self.on_token_focus_out()  # 토큰 세션 암호화 저장 트리거
@@ -343,6 +371,21 @@ class UndiscordGUIApp:
             wipe_memory_string(token)
         except Exception:
             pass
+
+    def start_dynamic_pin_update(self):
+        """백그라운드 스레드에서 최신 SSL 핀 목록을 동적으로 업데이트하고 결과를 로그창에 기록합니다."""
+        def run_update():
+            from undiscord_client import update_pins_dynamically
+            self.write_log('info', "최신 SSL 인증서 핀 목록 확인 중..." if self.current_lang == 'ko' else "Checking for the latest SSL certificate pins...")
+            res = update_pins_dynamically()
+            if res['status'] == 'success':
+                self.write_log('success', f"[보안] {res['message']}")
+            elif res['status'] == 'fallback':
+                self.write_log('warn', f"[보안] {res['message']}")
+            else:
+                self.write_log('error', f"[보안] {res['message']}")
+                
+        threading.Thread(target=run_update, daemon=True).start()
 
     def click_clear_log(self):
         self.log_area.delete("1.0", tk.END)
@@ -385,7 +428,7 @@ class UndiscordGUIApp:
             messagebox.showerror(msg['err_title'], msg['err_delay_number'])
             return
 
-        token = self.var_token.get().strip()
+        token = self.session_token
         guild_id = self.var_guild_id.get().strip()
         channel_raw = self.var_channel_id.get().strip()
 
@@ -443,6 +486,7 @@ class UndiscordGUIApp:
             'includeNsfw': True,
             'includePinned': self.var_include_pinned.get(),
             'backupDeleted': self.var_backup_deleted.get(),
+            'maskChatLog': self.var_mask_chat_log.get(),
             'searchDelay': search_delay,
             'useRandomDelay': True,
             'minDeleteDelay': min_delay,
@@ -845,7 +889,7 @@ class UndiscordGUIApp:
 
     def load_guilds_async(self):
         """서버 목록 조회를 위해 비동기 백그라운드 스레드를 기동합니다."""
-        token = self.var_token.get().strip()
+        token = self.session_token
         msg = MESSAGES[self.current_lang]
         if not token:
             self.write_log('warn', msg['err_token_required_for_fetch'])
@@ -921,7 +965,7 @@ class UndiscordGUIApp:
 
     def load_channels_async(self, guild_id):
         """서버 ID에 귀속된 채널 목록 조회를 위해 비동기 백그라운드 스레드를 기동합니다."""
-        token = self.var_token.get().strip()
+        token = self.session_token
         msg = MESSAGES[self.current_lang]
         if not token:
             return

@@ -101,8 +101,7 @@ def run_login_window():
                             except Exception as e:
                                 print(f"ERROR: IPC encryption failed: {e}", flush=True)
                         else:
-                            # 평문 폴백 (하위 호환)
-                            print(f"TOKEN:{token_found[0]}", flush=True)
+                            print("ERROR: IPC key (ENV_SEC_KEY) is missing. Unencrypted token transmission is blocked for security reasons.", flush=True)
                         
                         # 메모리 보호: 평문 토큰을 메모리상에서 즉각 소거
                         try:

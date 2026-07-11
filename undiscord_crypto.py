@@ -167,3 +167,21 @@ def wipe_memory_string(string_obj: str):
     except Exception:
         pass
 
+
+def verify_ed25519_signature(data_bytes: bytes, signature_hex: str, public_key_hex: str) -> bool:
+    """
+    Ed25519 공개키(Hex)를 사용하여 원격지로부터 다운로드한 데이터 바이트와
+    서명 값(Hex)을 대조 검증합니다. 서명이 유효하면 True, 실패 시 False를 반환합니다.
+    """
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        pub_bytes = bytes.fromhex(public_key_hex)
+        sig_bytes = bytes.fromhex(signature_hex)
+        
+        public_key = ed25519.Ed25519PublicKey.from_public_bytes(pub_bytes)
+        public_key.verify(sig_bytes, data_bytes)
+        return True
+    except Exception:
+        return False
+
+

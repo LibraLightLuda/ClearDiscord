@@ -214,6 +214,10 @@ def create_widgets(app):
     app.chk_backup_deleted = ttk.Checkbutton(chk_sub, text="지운 메시지 PC에 백업", variable=app.var_backup_deleted, style='Card.TCheckbutton', command=app.update_checkbox_ux)
     app.chk_backup_deleted.grid(row=1, column=1, sticky="w", padx=2, pady=3)
 
+    app.var_mask_chat_log = tk.BooleanVar(value=False)
+    app.chk_mask_chat_log = ttk.Checkbutton(chk_sub, text="로그에 내 채팅 내용 마스킹", variable=app.var_mask_chat_log, style='Card.TCheckbutton', command=app.update_checkbox_ux)
+    app.chk_mask_chat_log.grid(row=2, column=0, columnspan=2, sticky="w", padx=2, pady=3)
+
     # ---- Card 4: 지연 시간 및 우회 속도 설정 ----
     app.card4 = ttk.LabelFrame(top_frame, text="  지연 시간 및 우회 속도 설정  ", style='Card.TLabelframe')
     app.card4.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
@@ -477,5 +481,9 @@ def update_checkbox_ux(app):
         # 4. 지운 메시지 백업
         backup_deleted_text = f"{status_active if app.var_backup_deleted.get() else status_inactive}{msg.get('chk_backup_deleted', '지운 메시지 PC에 백업')}"
         app.chk_backup_deleted.configure(text=backup_deleted_text)
+        
+        # 5. 로그 내 채팅 내용 마스킹
+        mask_chat_log_text = f"{status_active if app.var_mask_chat_log.get() else status_inactive}{msg.get('chk_mask_chat_log', '로그에 내 채팅 내용 마스킹')}"
+        app.chk_mask_chat_log.configure(text=mask_chat_log_text)
     except Exception as e:
         print(f"체크박스 UX 업데이트 에러: {e}")

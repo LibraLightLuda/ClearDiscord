@@ -240,5 +240,53 @@ class TestUndiscordCore(unittest.TestCase):
         self.core.delete_messages_from_list()
         mock_open_file.assert_not_called()
 
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('os.path.exists')
+    @patch('os.makedirs')
+    @patch('undiscord_gui.UndiscordCore.delete_message')
+    def test_mask_chat_log_and_backup_intact(self, mock_delete_msg, mock_makedirs, mock_exists, mock_open_file):
+        mock_delete_msg.return_value = 'OK'
+        mock_exists.return_value = True
+        
+        # 1. maskChatLog = True 일 때 로그 마스킹 검증 및 백업본 원본 유지 검증
+        self.core.options['maskChatLog'] = True
+        self.core.options['backupDeleted'] = True
+        
+        message = {'id': '99999', 'timestamp': '2026-07-11T16:44:05', 'author': {'username': 'mask_test', 'discriminator': '1234', 'id': '8888'}, 'content': '마스킹 대상 원래 내용', 'channel_id': '7777'}
+        self.core.state['_messagesToDelete'] = [message]
+        self.core.state['grandTotal'] = 1
+        self.core.state['running'] = True
+        
+        # 로그 큐를 가로채기 위해 log 함수 임시 모의화
+        logged_messages = []
+        def mock_log(log_type, text):
+            logged_messages.append(text)
+        self.core.log = mock_log
+        
+        self.core.delete_messages_from_list()
+        
+        # 로그에 '●●● (마스킹됨)'이 포함되어 있는지 검증
+        mask_logged = any('●●● (마스킹됨)' in log_text for log_text in logged_messages)
+        self.assertTrue(mask_logged, "마스킹 옵션이 활성화되면 로그에 마스킹된 내용이 출력되어야 합니다.")
+        
+        # 백업 파일 쓰기(write) 시 원본 내용이 그대로 전달되었는지 검증
+        mock_open_file.assert_called_once()
+        handle = mock_open_file.return_value.__enter__.return_value
+        written_content = "".join([call_args[0][0] for call_args in handle.write.call_args_list])
+        self.assertIn('마스킹 대상 원래 내용', written_content, "마스킹 옵션이 활성화되더라도 백업 파일에는 원본 내용이 저장되어야 합니다.")
+        self.assertNotIn('●●● (마스킹됨)', written_content, "백업 파일에는 마스킹 내용이 들어가면 안 됩니다.")
+        
+        # 2. maskChatLog = False 일 때 로그에 원본 노출 검증
+        self.core.options['maskChatLog'] = False
+        self.core.state['_messagesToDelete'] = [message]
+        self.core.state['running'] = True
+        logged_messages.clear()
+        
+        self.core.delete_messages_from_list()
+        
+        normal_logged = any('마스킹 대상 원래 내용' in log_text for log_text in logged_messages)
+        self.assertTrue(normal_logged, "마스킹 옵션이 비활성화되면 로그에 원래 메시지 내용이 노출되어야 합니다.")
+
 if __name__ == '__main__':
     unittest.main()
+

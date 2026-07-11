@@ -27,14 +27,22 @@
 1.  **비밀번호로 로그인 열쇠 잠금 (안전 보관)**
     *   디스코드에 접속하려면 내 계정의 고유한 "로그인 열쇠(토큰)"가 필요합니다. 이 길고 복잡한 열쇠를 매번 입력할 필요가 없도록 비밀번호를 설정해 안전하게 저장해 둡니다.
     *   보안을 위해 **비밀번호를 3번 연속으로 틀리면**, 저장되어 있던 내 계정 열쇠 정보가 컴퓨터에서 완전히 지워집니다.
-2.  **원하는 대화방 골라 지우기**
+2.  **토큰 정보 마스킹 및 화면 노출 차단 (보안 강화)**
+    *   대시보드 상에서 로그인 열쇠(토큰)를 입력하거나 가져오는 즉시 `••••••••••••••••`로 숨김 처리하여 주변 노출 및 숄더 서핑 위험을 방지합니다. 한시적으로 보기/숨기기 버튼을 통해 확인할 수 있습니다.
+3.  **원하는 대화방 골라 지우기**
     *   내가 참여 중인 서버의 특정 채팅방만 지울 수도 있고, 친구와의 **1:1 개인 대화방**에 내가 쓴 글만 쏙 골라 지울 수도 있습니다.
-3.  **지우고 싶은 날짜 범위 지정하기**
+4.  **지우고 싶은 날짜 범위 지정하기**
     *   "오늘 쓴 글만 지우기", "1주일 전부터 쓴 글만 지우기", "특정 날짜 사이에 쓴 글만 지우기" 등 날짜를 손쉽게 골라 청소할 수 있습니다.
-4.  **특정 글만 골라 지우기 (필터)**
+5.  **특정 글만 골라 지우기 (필터)**
     *   특정 단어가 들어간 글만 지우기
     *   사진이나 동영상 파일이 올라간 글만 지우기 (채널 용량 정리용)
     *   링크 주소가 들어간 글만 지우기
+6.  **지운 메시지 PC에 백업하기**
+    *   디스코드에서 영구 삭제하기 전에, 삭제될 메시지의 원본 내용을 로컬 컴퓨터(`deleted_backups/` 폴더)에 텍스트 형식으로 안전하게 백업 및 저장합니다.
+7.  **로그 메시지 내 채팅 내용 마스킹 (개인정보 보호)**
+    *   옵션을 켜면 삭제 진행 로그창과 삭제 전 확인 창에서 내 채팅 내용이 `●●● (마스킹됨)` 처리되어 화면을 방송하거나 캡처할 때 개인정보나 대화 내용 유출을 완전히 보호합니다. (백업 파일에는 원본 내용이 그대로 기록됩니다.)
+8.  **동적 SSL 피닝 및 Ed25519 서명 검증 (네트워크 보안)**
+    *   앱 실행 시 원격 저장소로부터 Ed25519 비대칭키로 전자 서명된 최신 SSL 인증서 지문 목록을 동적으로 내려받아 갱신합니다. 이를 통해 사설 인증서를 통한 네트워크 패킷 도청 및 중간자 공격(MITM)을 원천 차단하며, 검증 실패 시 내장 핀으로 안전하게 자동 폴백(Fallback)합니다.
 
 ---
 
@@ -88,14 +96,22 @@ We have translated complex technical features into easy-to-use functions for eve
 1.  **Secure Lock for Your Account Key (Password Protected)**
     *   To connect to Discord, the app needs your account's unique "key" (called an Authorization Token). You can save this long key securely under a master password.
     *   For your security, **if you enter the wrong password 3 times in a row**, the saved account key will be completely wiped from your computer.
-2.  **Clean Any Room You Want**
+2.  **Token Masking & Anti-Exposure (Enhanced Security)**
+    *   Once input or loaded, your account key (token) is immediately masked as `••••••••••••••••` to prevent accidental exposure or shoulder-surfing. You can temporarily toggle visibility using the view/hide button.
+3.  **Clean Any Room You Want**
     *   You can clean a specific text channel in a server, or target a **1-on-1 Direct Message (DM)** room to delete only your past messages.
-3.  **Choose Date Ranges**
+4.  **Choose Date Ranges**
     *   Easily clean messages based on time, such as "Delete messages from today", "Delete messages from a week ago", or messages sent within a specific date range.
-4.  **Delete Specific Messages Only (Filters)**
+5.  **Delete Specific Messages Only (Filters)**
     *   Delete messages containing specific words.
     *   Delete messages with attached images or files (great for freeing up space).
     *   Delete messages containing links.
+6.  **Backup Deleted Messages to PC**
+    *   Before deleting messages permanently from Discord, it securely saves and backs up the original content to your local machine (inside the `deleted_backups/` folder) in a text format.
+7.  **Chat Log Content Masking (Privacy Guard)**
+    *   When enabled, your chat contents are masked as `●●● (Masked)` in the real-time log box and confirmation popup. This protects your private conversations when streaming or taking screenshots, while raw text is still safely written to the local backup files.
+8.  **Dynamic SSL Pinning & Ed25519 Verification (Network Security)**
+    *   On startup, the client dynamically pulls and updates the latest SSL certificate pins from our remote repository after verifying them with a cryptographic Ed25519 signature. This prevents packet sniffing and Man-in-the-Middle (MITM) attacks, with a safe automatic fallback to default pins if verification or connection fails.
 
 ---
 

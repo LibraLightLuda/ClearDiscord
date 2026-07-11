@@ -16,11 +16,13 @@ def restore_token_session(app, data):
     
     # 1단계: 암호화 안 된 평문 토큰 복구 시도 (하위 호환)
     if 'token' in data and data['token']:
-        app.var_token.set(data['token'])
+        app.session_token = data['token']
+        app.var_token.set("••••••••••••••••")
         app.session_password = ""
         app.write_log('success', "저장된 평문 토큰을 성공적으로 로드했습니다." if app.current_lang == 'ko' else "Successfully loaded the stored plaintext token.")
         update_ui_texts(app)
         app.root.deiconify()
+        app.start_dynamic_pin_update()
         return
         
     # 2단계: 암호화된 토큰 파라미터가 있을 때의 암호 팝업 복구 루프
@@ -52,7 +54,8 @@ def restore_token_session(app, data):
                 input_pass = dlg.result
                 try:
                     dec_token = decrypt_data(enc_token, input_pass, salt_val, verify_val)
-                    app.var_token.set(dec_token)
+                    app.session_token = dec_token
+                    app.var_token.set("••••••••••••••••")
                     app.session_password = input_pass
                     
                     # 메모리 보호: 사용 완료된 평문 문자열은 즉시 소거
@@ -70,6 +73,7 @@ def restore_token_session(app, data):
                         # 3회 연속 오답 시 로컬 보안 보호를 위해 저장 데이터 파괴
                         messagebox.showerror(msg['pass_destroy_title'], msg['pass_destroy_msg'])
                         app.session_password = None
+                        app.session_token = ""
                         app.var_token.set("")
                         
                         # JSON 설정 파일 암호화 지표 초기화 기록
@@ -94,6 +98,7 @@ def restore_token_session(app, data):
             update_ui_texts(app)
             # 비밀번호 검증 성공 시에만 메인 창 노출
             app.root.deiconify()
+            app.start_dynamic_pin_update()
         else:
             # 취소 또는 3회 실패 시 즉각 프로그램 파괴/완전 종료
             if retry_count >= max_attempts:
@@ -112,17 +117,20 @@ def restore_token_session(app, data):
                 app.write_log('success', "비밀번호 설정 없이 평문으로 저장되도록 시작합니다." if app.current_lang == 'ko' else "Started without password. Tokens will be saved in plaintext.")
                 app.save_config()
                 app.root.deiconify()
+                app.start_dynamic_pin_update()
             elif len(dlg.result) < 8:
                 messagebox.showerror(msg['pass_err_title'], msg['pass_len_error_exit'].replace("종료합니다", "평문 모드로 진행합니다").replace("Aborting execution", "Proceeding in plaintext mode"))
                 app.session_password = ""
                 app.save_config()
                 app.root.deiconify()
+                app.start_dynamic_pin_update()
             else:
                 app.session_password = dlg.result
                 app.write_log('success', msg['log_pass_init_ok'])
                 app.save_config()
                 # 설정 성공했으므로 메인 창 노출
                 app.root.deiconify()
+                app.start_dynamic_pin_update()
         else:
             app.write_log('warn', msg['pass_cancel_exit'])
             app.root.destroy()

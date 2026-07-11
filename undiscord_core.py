@@ -343,7 +343,11 @@ class UndiscordCore:
             content = message.get('content', '')
             msg_id = message.get('id', '')
 
-            content_preview = f"{content[:40]}..." if len(content) > 40 else content
+            # 로그상에 내 채팅 내용 마스킹 옵션이 활성화된 경우 내용 마스킹 (백업 파일 등에는 영향 없음)
+            if self.options.get('maskChatLog', False):
+                content_preview = "●●● (마스킹됨)"
+            else:
+                content_preview = f"{content[:40]}..." if len(content) > 40 else content
             info_text = MESSAGES[self.lang]['log_engine_info_fmt'].format(
                 del_count=self.state['delCount'] + 1,
                 total=self.state['grandTotal'],
@@ -437,10 +441,17 @@ class UndiscordCore:
                 empty_retry_count = 0  # 메시지를 찾았으므로 재시도 횟수 초기화
                 if self.options.get('askForConfirmation'):
                     if self.options.get('ask_callback'):
-                        preview = "\n".join([
-                            f"- {m.get('author', {}).get('username', 'Unknown')}: {m.get('content', '')[:40]}"
-                            for m in self.state['_messagesToDelete'][:5]
-                        ])
+                        # 로그상에 내 채팅 내용 마스킹 옵션이 활성화된 경우 팝업 메시지 내용 마스킹
+                        if self.options.get('maskChatLog', False):
+                            preview = "\n".join([
+                                f"- {m.get('author', {}).get('username', 'Unknown')}: ●●● (마스킹됨)"
+                                for m in self.state['_messagesToDelete'][:5]
+                            ])
+                        else:
+                            preview = "\n".join([
+                                f"- {m.get('author', {}).get('username', 'Unknown')}: {m.get('content', '')[:40]}"
+                                for m in self.state['_messagesToDelete'][:5]
+                            ])
                         msg = MESSAGES[self.lang]['log_engine_confirm_msg'].format(
                             total=self.state['grandTotal'],
                             etr=ms_to_hms(self.stats['etr']),

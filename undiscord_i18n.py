@@ -76,6 +76,7 @@ MESSAGES = {
         'chk_has_file': "파일 첨부 메시지만 삭제",
         'chk_include_pinned': "핀 고정 메시지도 삭제",
         'chk_backup_deleted': "지운 메시지 PC에 백업",
+        'chk_mask_chat_log': "로그에 내 채팅 내용 마스킹",
         
         # 카드 4: 지연 대기 설정
         'search_delay_label': "검색 대기 시간 (밀리초)",
@@ -312,6 +313,7 @@ MESSAGES = {
         'chk_has_file': "Only delete messages containing Files",
         'chk_include_pinned': "Also delete Pinned messages",
         'chk_backup_deleted': "Backup deleted messages to PC",
+        'chk_mask_chat_log': "Mask my chat content in logs",
         
         # Card 4: Delay Settings
         'search_delay_label': "Search Wait Time (milliseconds)",

@@ -19,7 +19,7 @@ def save_config(app):
     enc_token = ""
     salt_val = ""
     verify_val = ""
-    token_plain = app.var_token.get()
+    token_plain = app.session_token
     
     if app.session_password:
         from undiscord_crypto import encrypt_data
@@ -44,6 +44,7 @@ def save_config(app):
         'includeNsfw': True,
         'includePinned': app.var_include_pinned.get(),
         'backupDeleted': app.var_backup_deleted.get(),
+        'maskChatLog': app.var_mask_chat_log.get(),
         'searchDelay': app.var_search_delay.get(),
         'minDelay': app.var_min_delay.get(),
         'maxDelay': app.var_max_delay.get(),
@@ -135,6 +136,7 @@ def load_config(app):
     if 'hasFile' in data: app.var_has_file.set(data['hasFile'])
     if 'includePinned' in data: app.var_include_pinned.set(data['includePinned'])
     if 'backupDeleted' in data: app.var_backup_deleted.set(data['backupDeleted'])
+    if 'maskChatLog' in data: app.var_mask_chat_log.set(data['maskChatLog'])
     
     # 설정 복원 후 체크박스 활성/비활성 UX 텍스트 업데이트
     from undiscord_layout import update_checkbox_ux
