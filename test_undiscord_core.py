@@ -61,7 +61,7 @@ class TestUndiscordCore(unittest.TestCase):
         self.assertIsNone(to_snowflake(""))
         self.assertIsNone(to_snowflake(None))
 
-    @patch('requests.Session.get')
+    @patch('curl_cffi.requests.Session.get')
     def test_search_success(self, mock_get):
         # API 성공 응답 모의화
         mock_response = MagicMock()
@@ -81,7 +81,7 @@ class TestUndiscordCore(unittest.TestCase):
         self.assertEqual(res['total_results'], 100)
         self.assertEqual(self.core.state['_searchResponse']['total_results'], 100)
 
-    @patch('requests.Session.get')
+    @patch('curl_cffi.requests.Session.get')
     def test_search_rate_limited(self, mock_get):
         # 429 에러 후 200 성공 순차 모의화
         mock_resp_429 = MagicMock()
@@ -239,6 +239,41 @@ class TestUndiscordCore(unittest.TestCase):
         
         self.core.delete_messages_from_list()
         mock_open_file.assert_not_called()
+
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('os.path.exists')
+    @patch('os.makedirs')
+    @patch('undiscord_gui.UndiscordCore.delete_message')
+    def test_backup_format_and_no_msgid(self, mock_delete_msg, mock_makedirs, mock_exists, mock_open_file):
+        self.core.options['backupDeleted'] = True
+        mock_delete_msg.return_value = 'OK'
+        mock_exists.return_value = True
+        
+        message = {
+            'id': '1234567890123',
+            'timestamp': '2026-07-12T02:00:00Z', 
+            'author': {'username': 'test_user', 'discriminator': '5678', 'id': '8888'}, 
+            'content': '안녕하세요 반갑습니다.', 
+            'channel_id': '7777'
+        }
+        self.core.state['_messagesToDelete'] = [message]
+        self.core.state['grandTotal'] = 1
+        self.core.state['running'] = True
+        
+        self.core.delete_messages_from_list()
+        
+        mock_open_file.assert_called_once()
+        handle = mock_open_file.return_value.__enter__.return_value
+        written_content = "".join([call_args[0][0] for call_args in handle.write.call_args_list])
+        
+        # 1) msgid가 포함되어 있지 않은지 검증
+        self.assertNotIn('1234567890123', written_content, "백업 텍스트에 msgid가 포함되면 안 됩니다.")
+        # 2) === 와 같은 구분선이나 불필요한 줄간격이 없는지 검증
+        self.assertNotIn('===', written_content, "구분선(===)이 포함되면 안 됩니다.")
+        # 3) [시간][글쓴사람][내용] 형태로 잘 구성되었는지 검증 (KST 혹은 시스템 타임존 변환 반영)
+        import re
+        pattern = r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\[test_user#5678\]\[안녕하세요 반갑습니다.\]\n$'
+        self.assertTrue(re.match(pattern, written_content) is not None, f"백업 포맷이 올바르지 않습니다: {written_content}")
 
     @patch('builtins.open', new_callable=MagicMock)
     @patch('os.path.exists')

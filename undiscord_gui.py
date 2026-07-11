@@ -365,12 +365,6 @@ class UndiscordGUIApp:
         self.write_log('success', msg['log_easy_login_success'])
         messagebox.showinfo(msg['ok'], msg['log_easy_login_success'])
         self.on_token_focus_out()  # 토큰 세션 암호화 저장 트리거
-        
-        # 메모리상 토큰 즉각 소거 (암호화 저장이 끝났으므로 복구 가능)
-        try:
-            wipe_memory_string(token)
-        except Exception:
-            pass
 
     def start_dynamic_pin_update(self):
         """백그라운드 스레드에서 최신 SSL 핀 목록을 동적으로 업데이트하고 결과를 로그창에 기록합니다."""

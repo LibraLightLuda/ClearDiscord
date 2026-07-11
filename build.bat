@@ -55,6 +55,19 @@ if %errorlevel% neq 0 (
     echo 'pywebview' library is already installed.
 )
 
+python -c "import curl_cffi" 2>nul
+if %errorlevel% neq 0 (
+    echo 'curl_cffi' library is missing. Installing...
+    pip install curl_cffi
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to install 'curl_cffi'.
+        if not "%CI%"=="true" pause
+        exit /b 1
+    )
+) else (
+    echo 'curl_cffi' library is already installed.
+)
+
 REM 2. Check PyInstaller
 echo [2/4] Checking PyInstaller installation...
 python -c "import PyInstaller" 2>nul
@@ -77,7 +90,7 @@ echo [3/4] Building executable file (.exe)...
 echo (This may take up to 2 minutes. Please wait...)
 echo.
 
-python -m PyInstaller --onefile --noconsole --icon="cold.ico" --add-data "cold.png;." --add-data "cold.ico;." --hidden-import=webview --name "UndiscordGUI" undiscord_gui.py
+python -m PyInstaller --onefile --noconsole --icon="cold.ico" --add-data "cold.png;." --add-data "cold.ico;." --hidden-import=webview --hidden-import=curl_cffi --name "UndiscordGUI" undiscord_gui.py
 
 if %errorlevel% neq 0 (
     echo.

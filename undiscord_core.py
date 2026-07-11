@@ -8,11 +8,12 @@ Undiscord Core 엔진 모듈
 import re
 import time
 import random
-import requests
+from curl_cffi import requests
+import base64
+import json
 from datetime import datetime
 from undiscord_utils import ms_to_hms, to_snowflake, validate_discord_url
 from undiscord_i18n import MESSAGES
-from undiscord_client import PinnedHTTPAdapter
 
 class UndiscordCore:
     """
@@ -50,15 +51,44 @@ class UndiscordCore:
             'etr': 0
         }
 
-        self.session = requests.Session()
-        # SSL 인증서 피닝 어댑터 적용
-        self.session.mount("https://", PinnedHTTPAdapter())
+        self.session = requests.Session(impersonate="chrome120")
         self.session.trust_env = False
         # 만인간 공격(MitM) 프록시 탈취 방지를 위해 로컬 프록시 우회 설정 강제 주입
         self.session.proxies = {'http': None, 'https': None}
+
+        # X-Super-Properties 헤더를 위한 브라우저 환경 데이터 Base64 인코딩
+        super_properties = {
+            "os": "Windows",
+            "browser": "Chrome",
+            "device": "",
+            "system_locale": "ko-KR" if self.lang == 'ko' else "en-US",
+            "browser_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "browser_version": "120.0.0.0",
+            "os_version": "10",
+            "referrer": "",
+            "referring_domain": "",
+            "referrer_current": "",
+            "referring_domain_current": "",
+            "release_channel": "stable",
+            "client_build_number": 240000,
+            "client_event_source": None
+        }
+        super_properties_b64 = base64.b64encode(json.dumps(super_properties).encode('utf-8')).decode('utf-8')
+
         self.session.headers.update({
             'Authorization': self.options.get('authToken', ''),
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7' if self.lang == 'ko' else 'en-US,en;q=0.9',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'X-Discord-Locale': self.lang,
+            'X-Debug-Options': 'bugReporterEnabled',
+            'X-Super-Properties': super_properties_b64
         })
         self._before_ts = 0
 
@@ -149,8 +179,13 @@ class UndiscordCore:
 
         if guild_id == '@me':
             url = f"https://discord.com/api/v9/channels/{channel_id}/messages/search"
+            referer = f"https://discord.com/channels/@me/{channel_id}"
         else:
             url = f"https://discord.com/api/v9/guilds/{guild_id}/messages/search"
+            referer = f"https://discord.com/channels/{guild_id}/{channel_id}" if channel_id else f"https://discord.com/channels/{guild_id}"
+
+        # Referer 헤더 동적 갱신
+        self.session.headers.update({'Referer': referer})
 
         # 위조 도메인 방지용 화이트리스트 검사
         validate_discord_url(url)
@@ -217,7 +252,7 @@ class UndiscordCore:
             time.sleep(retry_after * 2)
             return self.search()
 
-        if not resp.ok:
+        if not (200 <= resp.status_code < 300):
             self.state['running'] = False
             try:
                 err_body = resp.json()
@@ -309,7 +344,7 @@ class UndiscordCore:
             time.sleep(retry_after * 2)
             return 'RETRY'
 
-        elif not resp.ok:
+        elif not (200 <= resp.status_code < 300):
             if resp.status_code == 400:
                 try:
                     err_json = resp.json()
@@ -569,51 +604,66 @@ class UndiscordCore:
             file_path = os.path.join(backup_dir, file_name)
             
             # 3. 디스코드 메시지 상세 정보 파싱
-            msg_id = message.get('id', 'N/A')
             msg_time = message.get('timestamp', 'N/A')
+            
+            # 시간 형식 변환 시도 (사용자 편의를 위해 로컬 시간대로 포맷팅)
+            try:
+                clean_time = msg_time.replace('Z', '+00:00')
+                dt = datetime.fromisoformat(clean_time)
+                dt_local = dt.astimezone()
+                time_str = dt_local.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception:
+                time_str = msg_time
+                
             author = message.get('author', {})
             username = author.get('username', 'Unknown')
             discriminator = author.get('discriminator', '0000')
-            author_id = author.get('id', 'N/A')
+            
+            # 태그(#) 포맷 처리 (신규 사용자명 방식 대응)
+            if discriminator and discriminator != '0000' and discriminator != '0':
+                author_name = f"{username}#{discriminator}"
+            else:
+                author_name = username
+                
             content = message.get('content', '')
             
-            # 첨부 파일 목록
+            # 첨부 파일 목록 가공
             attachments = message.get('attachments', [])
-            attach_str = ""
+            attach_list = []
             if attachments:
-                attach_str = "\nAttachments:\n" + "\n".join([f"- {a.get('url', 'N/A')}" for a in attachments])
-                
-            # 임베드 정보 목록
+                for a in attachments:
+                    url = a.get('url')
+                    if url:
+                        attach_list.append(url)
+            
+            # 임베드 정보 목록 가공
             embeds = message.get('embeds', [])
-            embed_str = ""
+            embed_list = []
             if embeds:
-                embed_list = []
                 for emb in embeds:
                     title = emb.get('title')
                     desc = emb.get('description')
                     url = emb.get('url')
                     emb_detail = []
-                    if title: emb_detail.append(f"Title: {title}")
-                    if desc: emb_detail.append(f"Description: {desc}")
-                    if url: emb_detail.append(f"URL: {url}")
+                    if title: emb_detail.append(title)
+                    if desc: emb_detail.append(desc)
+                    if url: emb_detail.append(url)
                     if emb_detail:
-                        embed_list.append("  * " + ", ".join(emb_detail))
-                if embed_list:
-                    embed_str = "\nEmbeds:\n" + "\n".join(embed_list)
+                        embed_list.append(" | ".join(emb_detail))
+                        
+            # 최종 본문 구성 (첨부 및 임베드를 자연스럽게 추가)
+            full_content = content
+            if attach_list:
+                full_content += " " + " ".join([f"[첨부: {url}]" for url in attach_list])
+            if embed_list:
+                full_content += " " + " ".join([f"[임베드: {emb}]" for emb in embed_list])
+                
+            # [시간][글쓴사람][내용] 형태로 텍스트 구성
+            log_line = f"[{time_str}][{author_name}][{full_content}]\n"
             
-            # 파일 기록 (append 모드로 한 메시지씩 추가)
+            # 파일 기록 (append 모드로 한 메시지씩 추가, 메세지 단위 줄간격이나 === 와 같은 분리선 없음)
             with open(file_path, "a", encoding="utf-8") as f:
-                f.write("================================================================================\n")
-                f.write(f"Message ID: {msg_id}\n")
-                f.write(f"Timestamp: {msg_time} (UTC)\n")
-                f.write(f"Author: {username}#{discriminator} (ID: {author_id})\n")
-                f.write("Content:\n")
-                f.write(f"{content}\n")
-                if attach_str:
-                    f.write(f"{attach_str}\n")
-                if embed_str:
-                    f.write(f"{embed_str}\n")
-                f.write("================================================================================\n\n")
+                f.write(log_line)
                 
         except Exception as e:
             self.log('error', f"메시지 백업 실패: {e}")

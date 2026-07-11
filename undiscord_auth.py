@@ -58,8 +58,6 @@ def restore_token_session(app, data):
                     app.var_token.set("••••••••••••••••")
                     app.session_password = input_pass
                     
-                    # 메모리 보호: 사용 완료된 평문 문자열은 즉시 소거
-                    wipe_memory_string(dec_token)
                     app.write_log('success', msg['pass_verify_success'])
                     success = True
                     break

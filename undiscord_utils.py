@@ -29,6 +29,20 @@ except ImportError:
         sys.exit(1)
 
 
+# 2. curl_cffi (Cloudflare WAF 우회를 위한 TLS/HTTP2 모방 통신 라이브러리)
+try:
+    import curl_cffi
+except ImportError:
+    print("Cloudflare WAF 우회를 위해 'curl_cffi' 라이브러리가 필요합니다. 자동 설치를 시작합니다...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "curl_cffi"])
+        import curl_cffi
+        print("'curl_cffi' 라이브러리가 성공적으로 설치되었습니다.")
+    except Exception as e:
+        print(f"라이브러리 자동 설치 실패. 수동으로 'pip install curl_cffi'를 실행해 주세요. 에러: {e}")
+        sys.exit(1)
+
+
 # ==================================================
 # 시간 및 Discord Snowflake 변환 유틸리티 함수군
 # ==================================================

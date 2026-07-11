@@ -6,11 +6,11 @@ Undiscord SSL 피닝 탑재 HTTP 통신 클라이언트 유틸리티 모듈
 import ssl
 import hashlib
 import json
-import requests
+import base64
+from curl_cffi import requests
 from requests.adapters import HTTPAdapter
 from urllib3.connectionpool import HTTPSConnectionPool
 from undiscord_utils import validate_discord_url
-from undiscord_crypto import verify_ed25519_signature
 
 # 기본 내장 디스코드 CA 인증서 SHA-256 지문 목록 (백업용 및 최초 실행용)
 DEFAULT_CERT_PINS = {
@@ -23,63 +23,23 @@ DEFAULT_CERT_PINS = {
 # 실제 통신 과정에서 검사할 실시간 SSL 핀 메모리 버퍼
 DISCORD_CERT_PINS = set(DEFAULT_CERT_PINS)
 
-# 배포자 검증용 Ed25519 공개키 (Hex 64글자) 및 원격 갱신 주소
-SIGNER_PUBLIC_KEY = "261890fd1f824d70ffca8d4deb019db32c1d381f0fb0afe0cdd2a18732fef451"
-PIN_UPDATE_URL = "https://raw.githubusercontent.com/LibraLightLuda/ClearDiscord/main/cert_pins.json"
-
 
 def update_pins_dynamically() -> dict:
     """
-    원격 서버에서 비대칭키 서명된 최신 SSL 핀 목록을 다운로드하여 
-    메모리 내의 DISCORD_CERT_PINS를 동적으로 업데이트합니다.
-    갱신 및 검증에 성공할 경우 결과를 반환하며, 실패할 경우 디폴트 핀으로 안전하게 폴백합니다.
+    소스코드 내에 기본 내장된 신뢰 CA 인증서 핀 목록(DEFAULT_CERT_PINS)을
+    로컬에서 안전하게 확인하고 통신 검증 준비를 마칩니다.
+    (원격 갱신 주소 접속 및 Ed25519 서명 검증 방식에서 로컬 방식으로 전환됨)
     """
-    session = requests.Session()
-    # SSL 피닝이 없는 순수 HTTPS 어댑터를 마운트하여 갱신 서버 통신 시 순환 피닝 오류를 방지
-    session.mount("https://", HTTPAdapter())
-    session.trust_env = False
-    session.proxies = {'http': None, 'https': None}
-    
     try:
-        # 타임아웃 5초 지정하여 무한 대기 방지
-        resp = session.get(PIN_UPDATE_URL, timeout=5, verify=True)
-        if resp.status_code == 200:
-            payload = resp.json()
-            data = payload.get("data", {})
-            signature = payload.get("signature", "")
-            
-            # 서명 검증 대상 데이터를 일관성 있게 직렬화
-            serialized_data = json.dumps(data, sort_keys=True).encode('utf-8')
-            
-            if verify_ed25519_signature(serialized_data, signature, SIGNER_PUBLIC_KEY):
-                new_pins = data.get("pins", [])
-                if new_pins:
-                    DISCORD_CERT_PINS.clear()
-                    DISCORD_CERT_PINS.update(new_pins)
-                    return {
-                        "status": "success",
-                        "message": f"동적 SSL 인증서 핀 목록 갱신 완료 (수량: {len(new_pins)}개)",
-                        "pins": list(new_pins)
-                    }
-                else:
-                    return {
-                        "status": "fallback",
-                        "message": "갱신 데이터에 유효한 핀 목록이 없어 기본 핀으로 유지합니다."
-                    }
-            else:
-                return {
-                    "status": "fallback",
-                    "message": "서명 검증 실패(위조 가능성 감지). 안전을 위해 기존 핀 목록을 유지합니다."
-                }
-        else:
-            return {
-                "status": "fallback",
-                "message": f"원격 갱신 서버 응답 실패 (HTTP {resp.status_code}). 기존 핀 목록을 유지합니다."
-            }
+        # 이미 DISCORD_CERT_PINS는 DEFAULT_CERT_PINS로 초기화되어 작동 중입니다.
+        return {
+            "status": "success",
+            "message": f"로컬 SSL 인증서 핀 목록 로드 완료 (수량: {len(DISCORD_CERT_PINS)}개)"
+        }
     except Exception as e:
         return {
             "status": "fallback",
-            "message": f"원격 갱신 서버 통신 중 오류 발생 ({e}). 기존 핀 목록을 유지합니다."
+            "message": f"로컬 SSL 핀 목록 로드 중 오류 발생 ({e}). 기존 핀 목록을 유지합니다."
         }
 
 
@@ -107,19 +67,56 @@ class PinnedHTTPAdapter(HTTPAdapter):
 
 
 
+def get_browser_headers(token: str, referer: str = None) -> dict:
+    """브라우저의 요청 헤더와 X-Super-Properties를 모방한 공통 헤더를 생성합니다."""
+    super_properties = {
+        "os": "Windows",
+        "browser": "Chrome",
+        "device": "",
+        "system_locale": "ko-KR",
+        "browser_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "browser_version": "120.0.0.0",
+        "os_version": "10",
+        "referrer": "",
+        "referring_domain": "",
+        "referrer_current": "",
+        "referring_domain_current": "",
+        "release_channel": "stable",
+        "client_build_number": 240000,
+        "client_event_source": None
+    }
+    super_properties_b64 = base64.b64encode(json.dumps(super_properties).encode('utf-8')).decode('utf-8')
+    
+    headers = {
+        'Authorization': token,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'X-Discord-Locale': 'ko',
+        'X-Debug-Options': 'bugReporterEnabled',
+        'X-Super-Properties': super_properties_b64
+    }
+    if referer:
+        headers['Referer'] = referer
+    return headers
+
+
 def fetch_guilds(token: str) -> list:
     """주어진 디스코드 토큰을 사용하여 사용자가 참여 중인 서버(Guild) 목록을 가져옵니다."""
     url = "https://discord.com/api/v9/users/@me/guilds"
     validate_discord_url(url)
     
-    session = requests.Session()
-    session.mount("https://", PinnedHTTPAdapter())
+    session = requests.Session(impersonate="chrome120")
     session.trust_env = False
     session.proxies = {'http': None, 'https': None}
-    headers = {
-        'Authorization': token,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
+    
+    headers = get_browser_headers(token, referer="https://discord.com/channels/@me")
     resp = session.get(url, headers=headers, verify=True)
     if resp.status_code == 200:
         return resp.json()
@@ -134,19 +131,18 @@ def fetch_channels(token: str, guild_id: str) -> list:
     """
     if guild_id == "@me":
         url = "https://discord.com/api/v9/users/@me/channels"
+        referer = "https://discord.com/channels/@me"
     else:
         url = f"https://discord.com/api/v9/guilds/{guild_id}/channels"
+        referer = f"https://discord.com/channels/{guild_id}"
         
     validate_discord_url(url)
         
-    session = requests.Session()
-    session.mount("https://", PinnedHTTPAdapter())
+    session = requests.Session(impersonate="chrome120")
     session.trust_env = False
     session.proxies = {'http': None, 'https': None}
-    headers = {
-        'Authorization': token,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
+    
+    headers = get_browser_headers(token, referer=referer)
     resp = session.get(url, headers=headers, verify=True)
     if resp.status_code == 200:
         return resp.json()

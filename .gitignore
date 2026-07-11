@@ -24,3 +24,6 @@ Thumbs.db
 
 # Config files
 config.json
+
+# Local backup directory
+deleted_backups/
