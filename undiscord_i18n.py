@@ -69,12 +69,13 @@ MESSAGES = {
         ],
         
         # 카드 3: 상세 필터링
+        'status_active': "[활성] ",
+        'status_inactive': "[비활성] ",
         'search_text_label': "텍스트 검색어 필터",
-        'pattern_label': "정규표현식 매칭 필터",
         'chk_has_link': "링크 포함 메시지만 삭제",
         'chk_has_file': "파일 첨부 메시지만 삭제",
-        'chk_include_nsfw': "NSFW 채널 검색 포함",
         'chk_include_pinned': "핀 고정 메시지도 삭제",
+        'chk_backup_deleted': "지운 메시지 PC에 백업",
         
         # 카드 4: 지연 대기 설정
         'search_delay_label': "검색 대기 시간 (밀리초)",
@@ -216,9 +217,8 @@ MESSAGES = {
             "   - '삭제 시작 범위'와 '종료 범위'는 직접 디스코드 Snowflake ID를 기입하거나,\n"
             "     하단의 드롭다운 메뉴(예: '1일 전', '1주일 전' 등)를 통해 기동 시점을 기준으로 자동 계산해 채울 수 있습니다.\n"
             "   - 시작 범위 이후부터 종료 범위 이전의 메시지들만 안전하게 타겟팅됩니다.\n\n"
-            "2. [텍스트 및 정규표현식(Regex) 매칭 필터]\n"
-            "   - 텍스트 검색어 필터: 특정 단어가 포함된 메시지만 골라 지웁니다.\n"
-            "   - 정규표현식 매칭 필터: 조금 더 고차원적인 패턴 매칭(예: 전화번호, 이메일, 특정 양식)을 정밀 필터링합니다.\n\n"
+            "2. [텍스트 매칭 필터]\n"
+            "   - 텍스트 검색어 필터: 특정 단어가 포함된 메시지만 골라 지웁니다.\n\n"
             "3. [파일 및 링크 첨부 메시지 전용 필터]\n"
             "   - '링크 포함 메시지만 삭제': 일반 대화는 남기고 외부 URL 링크가 적힌 메시지만 삭제합니다.\n"
             "   - '파일 첨부 메시지만 삭제': 이미지, zip 등 파일이 업로드된 메시지만 삭제하여 채널 용량을 확보합니다.\n\n"
@@ -227,7 +227,7 @@ MESSAGES = {
             "   - 만약 핀 고정 메시지도 전부 지우기를 원하시면 '핀 고정 메시지도 삭제' 체크박스를 체크하십시오.\n\n"
             "5. [지연 시간 대기 설정]\n"
             "   - 검색 및 삭제 간격은 밀리초(ms) 단위로 조절 가능합니다.\n"
-            "   - 디스코드의 API Rate Limit 차단을 우회하기 위해 '최소 1500ms ~ 최대 3000ms'의 랜덤 딜레이 적용을 적극 권장합니다."
+            "   - 디스코드의 API Rate Limit 차단을 우회하기 위해 '최소 1500ms ~ 최대 5000ms'의 랜덤 딜레이 적용을 적극 권장합니다."
         ),
         
         # 엔진 로그 다국어 번역
@@ -236,7 +236,6 @@ MESSAGES = {
         'log_engine_indexing': "디스코드 서버가 검색 데이터를 인덱싱 중입니다. {retry_after}초 후 다시 시도합니다...",
         'log_engine_rate_limit_search': "검색 API 한도 도달! {wait_time}초 대기 후 검색 지연을 늘려 재시도합니다...",
         'log_engine_search_fail': "메시지 검색 실패! API 응답 코드: {status}, 본문: {err}",
-        'log_engine_regex_fail': "정규표현식 패턴 필터링 실패: {e}",
         'log_engine_delete_http_err': "메시지 삭제 요청 에러: {e}",
         'log_engine_rate_limit_delete': "삭제 API 한도 도달! {retry_after}초 대기 후 최소/최대 지연 범위를 {w}밀리초 ~ {w+1500}밀리초로 강제 상향 조절합니다...",
         'log_engine_archive_thread': "스레드가 아카이브 상태라 지울 수 없습니다. 오프셋을 증가시켜 통과합니다.",
@@ -260,6 +259,7 @@ MESSAGES = {
         'log_engine_skip_page': "현재 페이지에 삭제할 메시지가 존재하지 않습니다. 검색 범위를 조절하여 다음 페이지로 넘어갑니다. (오프셋: {old} -> {new})",
         'log_engine_api_end': "검색 결과의 끝에 도달했습니다. (API 빈 페이지 반환)",
         'log_engine_empty_retry': "검색 결과가 없습니다. 재검색을 시도합니다. ({attempt}/{max_attempt})",
+        'log_engine_delay_bypass': "[지연 우회] 디스코드 검색 인덱스 지연 감지. 검색 범위를 ID {max_id} 이전으로 강제 이동합니다.",
         'log_engine_next_page': "다음 검색 페이지 요청 대기: {delay}초...",
         'log_engine_finished': "삭제 프로세스가 완전히 종료되었습니다. (종료 시각: {time})",
         'log_engine_time_summary': "총 수행 시간: {time} | 삭제 성공: {del_count}건 | 삭제 실패: {fail_count}건",
@@ -305,12 +305,13 @@ MESSAGES = {
         ],
         
         # Card 3: Filters
+        'status_active': "[Active] ",
+        'status_inactive': "[Inactive] ",
         'search_text_label': "Text Query Search Filter",
-        'pattern_label': "Regular Expression (Regex) Filter",
         'chk_has_link': "Only delete messages containing Links",
         'chk_has_file': "Only delete messages containing Files",
-        'chk_include_nsfw': "Include NSFW Channels in search",
         'chk_include_pinned': "Also delete Pinned messages",
+        'chk_backup_deleted': "Backup deleted messages to PC",
         
         # Card 4: Delay Settings
         'search_delay_label': "Search Wait Time (milliseconds)",
@@ -451,9 +452,8 @@ MESSAGES = {
             "1. [Date Range Limits & Combobox Auto-Fill]\n"
             "   - 'Start Date' and 'End Date' accept direct Snowflake IDs or can be automatically filled using the dropdown values (e.g. '1 day ago', '1 week ago') calculated from the application runtime.\n"
             "   - Only messages created after the Start Range and before the End Range will be targeted.\n\n"
-            "2. [Text Query & Regular Expression Filters]\n"
-            "   - Text Query: Targets only messages containing the specific keyword.\n"
-            "   - Regex Matching: Filters complex text patterns (e.g. email patterns, phone numbers) for targeted removal.\n\n"
+            "2. [Text Query Search Filter]\n"
+            "   - Text Query: Targets only messages containing the specific keyword.\n\n"
             "3. [File & Link Detection Filters]\n"
             "   - 'Only delete messages containing Links': Keeps normal conversations but wipes messages containing URLs.\n"
             "   - 'Only delete messages containing Files': Wipes images, documents, and ZIP files to restore server space.\n\n"
@@ -462,7 +462,7 @@ MESSAGES = {
             "   - If you wish to wipe pinned messages as well, check the 'Also delete Pinned messages' option.\n\n"
             "5. [API Rate Limit Bypass Delay]\n"
             "   - Search and delete request intervals are configured in milliseconds (ms).\n"
-            "   - To prevent IP blocks or account restrictions, it is highly recommended to use the default random delay (1500ms to 3000ms)."
+            "   - To prevent IP blocks or account restrictions, it is highly recommended to use the default random delay (1500ms to 5000ms)."
         ),
         
         # Engine Log English Translations
@@ -471,7 +471,6 @@ MESSAGES = {
         'log_engine_indexing': "Discord server is indexing search data. Retrying in {retry_after}s...",
         'log_engine_rate_limit_search': "Search API rate limit reached! Retrying in {wait_time}s with increased delay...",
         'log_engine_search_fail': "Message search failed! API Response: {status}, Body: {err}",
-        'log_engine_regex_fail': "Regex pattern filtering failed: {e}",
         'log_engine_delete_http_err': "Message delete request error: {e}",
         'log_engine_rate_limit_delete': "Delete API rate limit reached! Retrying in {retry_after}s, forcing delay range to {w}ms ~ {w+1500}ms...",
         'log_engine_archive_thread': "Thread is archived and cannot be deleted. Skipping by increasing offset.",
@@ -495,6 +494,7 @@ MESSAGES = {
         'log_engine_skip_page': "No messages to delete on current page. Skipping to next page by modifying range. (Offset: {old} -> {new})",
         'log_engine_api_end': "Reached end of search results. (API returned empty page)",
         'log_engine_empty_retry': "Search result is empty. Retrying search... ({attempt}/{max_attempt})",
+        'log_engine_delay_bypass': "[Bypass Delay] Discord search index delay detected. Forcing search range to shift before ID {max_id}.",
         'log_engine_next_page': "Waiting for next search query: {delay}s...",
         'log_engine_finished': "Deletion process finished completely. (End time: {time})",
         'log_engine_time_summary': "Total duration: {time} | Success: {del_count} | Fail: {fail_count}",

@@ -24,13 +24,14 @@ class TestUndiscordCore(unittest.TestCase):
             'minId': None,
             'maxId': None,
             'content': None,
-            'pattern': None,
             'hasLink': False,
             'hasFile': False,
             'includeNsfw': True,
             'includePinned': False,
             'searchDelay': 1,
             'deleteDelay': 1,
+            'minDeleteDelay': 0,
+            'maxDeleteDelay': 0,
             'useRandomDelay': False,
             'maxAttempt': 1,
             'askForConfirmation': False
@@ -130,26 +131,7 @@ class TestUndiscordCore(unittest.TestCase):
         # 102(핀 고정으로 스킵), 103(타입 유효성 미달로 스킵)
         self.assertEqual(len(self.core.state['_skippedMessages']), 2)
 
-    def test_filter_response_with_regex(self):
-        # 정규표현식 매칭 테스트
-        self.core.state['_searchResponse'] = {
-            'total_results': 5,
-            'messages': [
-                [
-                    {'id': '201', 'hit': True, 'type': 0, 'content': '사과가 맛있다.', 'author': {'username': 'user1'}, 'channel_id': '111213'}
-                ],
-                [
-                    {'id': '202', 'hit': True, 'type': 0, 'content': '바나나가 최고야.', 'author': {'username': 'user1'}, 'channel_id': '111213'}
-                ]
-            ]
-        }
-        
-        # '사과' 단어 정규식 적용
-        self.core.options['pattern'] = '사과'
-        self.core.filter_response()
-        
-        self.assertEqual(len(self.core.state['_messagesToDelete']), 1)
-        self.assertEqual(self.core.state['_messagesToDelete'][0]['id'], '201')
+    # test_filter_response_with_regex 제거됨 (정규식 필터링 기능 제거에 따른 검증 불필요)
     @patch('undiscord_gui.UndiscordCore.delete_message')
     def test_consecutive_delete_failures(self, mock_delete_msg):
         # 5회 연속 실패 시 작업이 조기에 멈추는지 검증
@@ -193,6 +175,70 @@ class TestUndiscordCore(unittest.TestCase):
         # 최초 1회 실행 + 재시도 10회 = 총 11회 호출되어야 함
         self.assertEqual(mock_search.call_count, 11, "최초 1회 및 10회 재시도로 총 11회 호출되어야 합니다.")
         self.assertFalse(self.core.state['running'], "10회 재시도 초과 후 루프가 중단되어야 합니다.")
+
+    @patch('undiscord_gui.UndiscordCore.search')
+    @patch('undiscord_gui.UndiscordCore.filter_response')
+    def test_empty_response_retry_bypass(self, mock_filter, mock_search):
+        # 1. 초기 상태 설정
+        self.core.state['last_min_id'] = '123456789'
+        self.core.options['searchDelay'] = 0
+
+        # search와 filter_response가 호출될 때 빈 삭제 목록을 반환하도록 모의화
+        def side_effect_search():
+            self.core.state['_searchResponse'] = {'messages': []}
+            return {'messages': []}
+
+        def side_effect_filter():
+            self.core.state['_messagesToDelete'] = []
+            self.core.state['_skippedMessages'] = []
+
+        mock_search.side_effect = side_effect_search
+        mock_filter.side_effect = side_effect_filter
+
+        # 2. run() 실행
+        self.core.run(is_job=False)
+
+        # 3. 우회 검증
+        # 최초 호출 + 2회 재시도 = 3회째에 bypass 동작하여 maxId = '123456788' 갱신 후 count=0 리셋
+        # 그 후 다시 10회 재시도 후 루프 종료 조건 검사 직전까지 가므로 총 14회 호출되어야 함.
+        self.assertEqual(mock_search.call_count, 14)
+        self.assertEqual(self.core.options['maxId'], '123456788')
+        self.assertEqual(self.core.state['offset'], 0)
+        self.assertIsNone(self.core.state['last_min_id'])
+        self.assertFalse(self.core.state['running'])
+
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('os.path.exists')
+    @patch('os.makedirs')
+    @patch('undiscord_gui.UndiscordCore.delete_message')
+    def test_backup_deleted_messages(self, mock_delete_msg, mock_makedirs, mock_exists, mock_open_file):
+        # 1. backupDeleted = True 검증
+        self.core.options['backupDeleted'] = True
+        mock_delete_msg.return_value = 'OK'
+        mock_exists.return_value = False
+        
+        # 삭제 대상 1개 세팅
+        message = {'id': '99999', 'timestamp': '2026-07-11T16:44:05', 'author': {'username': 'backup_test', 'discriminator': '1234', 'id': '8888'}, 'content': '백업용 테스트 메시지', 'channel_id': '7777'}
+        self.core.state['_messagesToDelete'] = [message]
+        self.core.state['grandTotal'] = 1
+        self.core.state['running'] = True
+        
+        self.core.delete_messages_from_list()
+        
+        # open 함수가 호출되었는지 검증
+        mock_open_file.assert_called_once()
+        # 파일명 포맷 검증 (guildId=67890, channel_id=7777)
+        called_args = mock_open_file.call_args[0]
+        self.assertTrue('backup_67890_7777.txt' in called_args[0].replace('/', '\\'))
+        
+        # 2. backupDeleted = False 일 때 호출 안 됨 검증
+        mock_open_file.reset_mock()
+        self.core.options['backupDeleted'] = False
+        self.core.state['_messagesToDelete'] = [message]
+        self.core.state['running'] = True
+        
+        self.core.delete_messages_from_list()
+        mock_open_file.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

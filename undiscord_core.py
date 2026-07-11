@@ -36,7 +36,8 @@ class UndiscordCore:
             'iterations': 0,
             '_searchResponse': None,
             '_messagesToDelete': [],
-            '_skippedMessages': []
+            '_skippedMessages': [],
+            'last_min_id': None
         }
 
         self.stats = {
@@ -76,7 +77,8 @@ class UndiscordCore:
             'iterations': 0,
             '_searchResponse': None,
             '_messagesToDelete': [],
-            '_skippedMessages': []
+            '_skippedMessages': [],
+            'last_min_id': None
         }
         self.options['askForConfirmation'] = True
 
@@ -96,7 +98,7 @@ class UndiscordCore:
     def print_stats(self):
         """현재 엔진의 구동 지연 세팅 및 평균 핑, 차단 횟수 통계를 GUI 로그로 출력합니다."""
         min_d = self.options.get('minDeleteDelay', 1500)
-        max_d = self.options.get('maxDeleteDelay', 3000)
+        max_d = self.options.get('maxDeleteDelay', 5000) # 기본 최대 대기 시간을 3000ms에서 5000ms로 변경
         
         self.log('verb', MESSAGES[self.lang]['log_engine_stats_delay'].format(
             min_d=min_d, 
@@ -115,12 +117,13 @@ class UndiscordCore:
     def get_delete_delay(self):
         """설정된 범위(minDeleteDelay ~ maxDeleteDelay) 내에서 무작위 대기 시간(초)을 결정해 반환합니다."""
         min_d = self.options.get('minDeleteDelay', 1500) / 1000.0
-        max_d = self.options.get('maxDeleteDelay', 3000) / 1000.0
+        max_d = self.options.get('maxDeleteDelay', 5000) / 1000.0 # 기본 최대 대기 시간을 3000ms에서 5000ms로 변경
         if min_d > max_d:
             min_d, max_d = max_d, min_d
         val = random.uniform(min_d, max_d)
         
-        self.log('debug', MESSAGES[self.lang]['log_engine_delay'].format(val=val))
+        # 사용자 요청에 따라 "랜덤 우회 지연 대기" 로그 출력을 제외합니다.
+        # self.log('debug', MESSAGES[self.lang]['log_engine_delay'].format(val=val))
         return val
 
     def calc_etr(self):
@@ -131,7 +134,7 @@ class UndiscordCore:
         remaining_searches = max(0, round(self.state['grandTotal'] / 25.0))
         search_wait = (self.options['searchDelay'] * remaining_searches)
 
-        avg_delete_delay = (self.options.get('minDeleteDelay', 1500) + self.options.get('maxDeleteDelay', 3000)) / 2.0
+        avg_delete_delay = (self.options.get('minDeleteDelay', 1500) + self.options.get('maxDeleteDelay', 5000)) / 2.0 # 기본 최대 대기 시간을 3000ms에서 5000ms로 변경
         remaining_messages = max(0, self.state['grandTotal'] - self.state['delCount'])
         delete_wait = (avg_delete_delay + self.stats['avgPing']) * remaining_messages
         self.stats['etr'] = int(max(0, search_wait + delete_wait))
@@ -172,8 +175,8 @@ class UndiscordCore:
             params['has'] = 'file'
         if self.options.get('content'):
             params['content'] = self.options['content']
-        if self.options.get('includeNsfw'):
-            params['include_nsfw'] = 'true'
+        # NSFW 채널 검색은 항상 포함하여 수행
+        params['include_nsfw'] = 'true'
 
         self.before_request()
         try:
@@ -256,18 +259,18 @@ class UndiscordCore:
                     continue
                 messages_to_delete.append(msg)
 
-        pattern = self.options.get('pattern')
-        if pattern:
-            try:
-                regex = re.compile(pattern, re.IGNORECASE)
-                messages_to_delete = [m for m in messages_to_delete if regex.search(m.get('content', ''))]
-            except Exception as e:
-                self.log('warn', MESSAGES[self.lang]['log_engine_regex_fail'].format(e=e))
+        # 정규표현식(pattern) 필터링 기능이 제거됨
 
         skipped_messages = [msg for msg in discovered_messages if msg not in messages_to_delete]
 
         self.state['_messagesToDelete'] = messages_to_delete
         self.state['_skippedMessages'] = skipped_messages
+
+        # 수집된 메시지 중 가장 오래된 메시지의 ID(최소값)를 기억해 둠 (인덱싱 지연 우회용)
+        if discovered_messages:
+            ids = [int(m['id']) for m in discovered_messages if 'id' in m]
+            if ids:
+                self.state['last_min_id'] = str(min(ids))
 
     def delete_message(self, message):
         """
@@ -369,6 +372,8 @@ class UndiscordCore:
 
             if success:
                 consecutive_fails = 0
+                if self.options.get('backupDeleted'):
+                    self.backup_message(message)
             else:
                 consecutive_fails += 1
                 if consecutive_fails >= 5:
@@ -461,6 +466,16 @@ class UndiscordCore:
                 if empty_retry_count < 10:
                     empty_retry_count += 1
                     self.log('warn', MESSAGES[self.lang]['log_engine_empty_retry'].format(attempt=empty_retry_count, max_attempt=10))
+                    
+                    # 인덱싱 지연 감지 시 maxId 강제 변경 우회 로직 (3회째 재시도에서 감지 시도)
+                    if empty_retry_count == 3 and self.state.get('last_min_id'):
+                        last_min_id = self.state['last_min_id']
+                        next_max_id = str(int(last_min_id) - 1)
+                        self.log('warn', MESSAGES[self.lang]['log_engine_delay_bypass'].format(max_id=next_max_id))
+                        self.options['maxId'] = next_max_id
+                        self.state['offset'] = 0
+                        self.state['last_min_id'] = None  # 한 번 사용 후 초기화
+                        empty_retry_count = 0  # 카운트 초기화하여 새로운 조건으로 재검색
                 else:
                     self.log('success', MESSAGES[self.lang]['log_engine_api_end'])
                     if is_job:
@@ -468,8 +483,9 @@ class UndiscordCore:
                     self.state['running'] = False
 
             if self.state['running']:
-                search_delay = self.options['searchDelay'] / 1000.0
-                self.log('verb', MESSAGES[self.lang]['log_engine_next_page'].format(delay=search_delay))
+                # "지연 시간 및 우회 속도 설정" 탭의 최소-최대 삭제 대기시간을 인용한 랜덤 대기 적용
+                search_delay = self.get_delete_delay()
+                self.log('verb', MESSAGES[self.lang]['log_engine_next_page'].format(delay=round(search_delay, 2)))
                 time.sleep(search_delay)
 
         self.stats['endTime'] = datetime.now()
@@ -525,6 +541,71 @@ class UndiscordCore:
     def stop(self):
         """메인 루프를 정지하여 추가적인 삭제 API 요청 수행을 보류 및 안전 중단합니다."""
         self.state['running'] = False
+
+    def backup_message(self, message):
+        """삭제되는 메시지의 세부 정보를 로컬 텍스트 파일에 기록합니다."""
+        import os
+        try:
+            # 1. 백업 디렉토리 생성
+            backup_dir = "deleted_backups"
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            
+            # 2. 파일명 지정 (backup_guildId_channelId.txt)
+            guild_id = self.options.get('guildId', 'unknown_guild')
+            channel_id = message.get('channel_id', self.options.get('channelId', 'unknown_channel'))
+            file_name = f"backup_{guild_id}_{channel_id}.txt"
+            file_path = os.path.join(backup_dir, file_name)
+            
+            # 3. 디스코드 메시지 상세 정보 파싱
+            msg_id = message.get('id', 'N/A')
+            msg_time = message.get('timestamp', 'N/A')
+            author = message.get('author', {})
+            username = author.get('username', 'Unknown')
+            discriminator = author.get('discriminator', '0000')
+            author_id = author.get('id', 'N/A')
+            content = message.get('content', '')
+            
+            # 첨부 파일 목록
+            attachments = message.get('attachments', [])
+            attach_str = ""
+            if attachments:
+                attach_str = "\nAttachments:\n" + "\n".join([f"- {a.get('url', 'N/A')}" for a in attachments])
+                
+            # 임베드 정보 목록
+            embeds = message.get('embeds', [])
+            embed_str = ""
+            if embeds:
+                embed_list = []
+                for emb in embeds:
+                    title = emb.get('title')
+                    desc = emb.get('description')
+                    url = emb.get('url')
+                    emb_detail = []
+                    if title: emb_detail.append(f"Title: {title}")
+                    if desc: emb_detail.append(f"Description: {desc}")
+                    if url: emb_detail.append(f"URL: {url}")
+                    if emb_detail:
+                        embed_list.append("  * " + ", ".join(emb_detail))
+                if embed_list:
+                    embed_str = "\nEmbeds:\n" + "\n".join(embed_list)
+            
+            # 파일 기록 (append 모드로 한 메시지씩 추가)
+            with open(file_path, "a", encoding="utf-8") as f:
+                f.write("================================================================================\n")
+                f.write(f"Message ID: {msg_id}\n")
+                f.write(f"Timestamp: {msg_time} (UTC)\n")
+                f.write(f"Author: {username}#{discriminator} (ID: {author_id})\n")
+                f.write("Content:\n")
+                f.write(f"{content}\n")
+                if attach_str:
+                    f.write(f"{attach_str}\n")
+                if embed_str:
+                    f.write(f"{embed_str}\n")
+                f.write("================================================================================\n\n")
+                
+        except Exception as e:
+            self.log('error', f"메시지 백업 실패: {e}")
 
 
 

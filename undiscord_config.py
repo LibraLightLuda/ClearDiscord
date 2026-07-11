@@ -38,11 +38,12 @@ def save_config(app):
         'minQuickSelect': app.combo_min_quick.current(),
         'maxQuickSelect': app.combo_max_quick.current(),
         'searchText': app.var_search_text.get(),
-        'pattern': app.var_pattern.get(),
+        'pattern': "",
         'hasLink': app.var_has_link.get(),
         'hasFile': app.var_has_file.get(),
-        'includeNsfw': app.var_include_nsfw.get(),
+        'includeNsfw': True,
         'includePinned': app.var_include_pinned.get(),
+        'backupDeleted': app.var_backup_deleted.get(),
         'searchDelay': app.var_search_delay.get(),
         'minDelay': app.var_min_delay.get(),
         'maxDelay': app.var_max_delay.get(),
@@ -130,11 +131,14 @@ def load_config(app):
         app.var_max_range.set(data['maxRange'])
 
     if 'searchText' in data: app.var_search_text.set(data['searchText'])
-    if 'pattern' in data: app.var_pattern.set(data['pattern'])
     if 'hasLink' in data: app.var_has_link.set(data['hasLink'])
     if 'hasFile' in data: app.var_has_file.set(data['hasFile'])
-    if 'includeNsfw' in data: app.var_include_nsfw.set(data['includeNsfw'])
     if 'includePinned' in data: app.var_include_pinned.set(data['includePinned'])
+    if 'backupDeleted' in data: app.var_backup_deleted.set(data['backupDeleted'])
+    
+    # 설정 복원 후 체크박스 활성/비활성 UX 텍스트 업데이트
+    from undiscord_layout import update_checkbox_ux
+    update_checkbox_ux(app)
     
     if 'searchDelay' in data: app.var_search_delay.set(data['searchDelay'])
     if 'minDelay' in data: app.var_min_delay.set(data['minDelay'])

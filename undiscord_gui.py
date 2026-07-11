@@ -352,6 +352,22 @@ class UndiscordGUIApp:
         prefix = f"[{now_time}] "
         self.log_area.insert(tk.END, prefix, 'verb')
         self.log_area.insert(tk.END, text + "\n", log_type)
+        
+        # 로그가 너무 많이 쌓여 메모리를 지나치게 점유하거나 GUI 렌더링이 느려지는 현상을 방지하기 위해,
+        # 최대 1000줄까지만 로그를 보존하고 오래된 로그 메시지는 자동으로 삭제하도록 제한합니다.
+        try:
+            # 'end-1c' 인덱스에서 줄 번호를 파악하여 현재 총 라인 수를 구합니다.
+            total_lines = int(self.log_area.index('end-1c').split('.')[0])
+            max_lines = 1000
+            if total_lines > max_lines:
+                # 보존할 개수를 초과한 오래된 앞줄 부분을 삭제합니다.
+                # (1.0 라인부터 초과분+1.0 라인 직전까지 일괄 제거)
+                delete_count = total_lines - max_lines
+                self.log_area.delete("1.0", f"{delete_count + 1}.0")
+        except Exception as e:
+            # 자동 로그 정리 중 혹여 예외가 발생하더라도 작업이 정상 진행되도록 예외 처리합니다.
+            print(f"[Warn] 로그 정리 실패: {e}")
+            
         self.log_area.see(tk.END)
 
     def click_start(self):
@@ -421,11 +437,12 @@ class UndiscordGUIApp:
             'minId': self.var_min_range.get().strip() or None,
             'maxId': self.var_max_range.get().strip() or None,
             'content': self.var_search_text.get().strip() or None,
-            'pattern': self.var_pattern.get().strip() or None,
+            'pattern': None,
             'hasLink': self.var_has_link.get(),
             'hasFile': self.var_has_file.get(),
-            'includeNsfw': self.var_include_nsfw.get(),
+            'includeNsfw': True,
             'includePinned': self.var_include_pinned.get(),
+            'backupDeleted': self.var_backup_deleted.get(),
             'searchDelay': search_delay,
             'useRandomDelay': True,
             'minDeleteDelay': min_delay,

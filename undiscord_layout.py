@@ -29,7 +29,9 @@ def setup_styles(app):
     style.configure('Card.TLabelframe.Label', background=app.bg_panel, foreground=app.color_accent, font=("Malgun Gothic", 10, "bold"))
 
     style.configure('Card.TCheckbutton', background=app.bg_panel, foreground=app.fg_white, font=("Malgun Gothic", 9))
-    style.map('Card.TCheckbutton', background=[('active', app.bg_panel)], foreground=[('active', app.fg_white)])
+    style.map('Card.TCheckbutton', 
+              background=[('active', app.bg_panel)], 
+              foreground=[('selected', app.color_success), ('!selected', app.fg_gray), ('active', app.fg_white)])
 
     style.configure('Success.TButton', background=app.color_success, foreground="#202225", font=("Malgun Gothic", 10, "bold"), borderwidth=0)
     style.map('Success.TButton', background=[('active', '#43b581')])
@@ -177,11 +179,10 @@ def create_widgets(app):
     app.card3.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
     app.card3.columnconfigure(0, weight=1)
 
-    # 텍스트 검색 및 Regex 필터
+    # 텍스트 검색 필터 (정규표현식 필터 제거됨)
     filter_sub = ttk.Frame(app.card3, style='Card.TFrame')
     filter_sub.grid(row=0, column=0, sticky="ew", padx=10, pady=(6, 2))
     filter_sub.columnconfigure(0, weight=1)
-    filter_sub.columnconfigure(1, weight=1)
 
     app.lbl_search_text = ttk.Label(filter_sub, text="텍스트 검색어 필터", style='Card.TLabel')
     app.lbl_search_text.grid(row=0, column=0, sticky="w", padx=2)
@@ -189,33 +190,29 @@ def create_widgets(app):
     app.entry_search_text = tk.Entry(filter_sub, textvariable=app.var_search_text, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
     app.entry_search_text.grid(row=1, column=0, sticky="ew", padx=2, pady=2, ipady=3)
 
-    app.lbl_pattern = ttk.Label(filter_sub, text="정규표현식 매칭 필터", style='Card.TLabel')
-    app.lbl_pattern.grid(row=0, column=1, sticky="w", padx=2)
-    app.var_pattern = tk.StringVar()
-    app.entry_pattern = tk.Entry(filter_sub, textvariable=app.var_pattern, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
-    app.entry_pattern.grid(row=1, column=1, sticky="ew", padx=2, pady=2, ipady=3)
-
-    # 체크박스 4종 필터
+    # 체크박스 필터 (NSFW 검색 제거, 체크박스 상태 UX 강화를 위해 command 연동)
     chk_sub = ttk.Frame(app.card3, style='Card.TFrame')
     chk_sub.grid(row=1, column=0, sticky="ew", padx=10, pady=(4, 8))
     chk_sub.columnconfigure(0, weight=1)
     chk_sub.columnconfigure(1, weight=1)
 
+    app.update_checkbox_ux = lambda: update_checkbox_ux(app)
+
     app.var_has_link = tk.BooleanVar(value=False)
-    app.chk_has_link = ttk.Checkbutton(chk_sub, text="링크 포함 메시지만 삭제", variable=app.var_has_link, style='Card.TCheckbutton')
+    app.chk_has_link = ttk.Checkbutton(chk_sub, text="링크 포함 메시지만 삭제", variable=app.var_has_link, style='Card.TCheckbutton', command=app.update_checkbox_ux)
     app.chk_has_link.grid(row=0, column=0, sticky="w", padx=2, pady=3)
 
     app.var_has_file = tk.BooleanVar(value=False)
-    app.chk_has_file = ttk.Checkbutton(chk_sub, text="파일 첨부 메시지만 삭제", variable=app.var_has_file, style='Card.TCheckbutton')
+    app.chk_has_file = ttk.Checkbutton(chk_sub, text="파일 첨부 메시지만 삭제", variable=app.var_has_file, style='Card.TCheckbutton', command=app.update_checkbox_ux)
     app.chk_has_file.grid(row=0, column=1, sticky="w", padx=2, pady=3)
 
-    app.var_include_nsfw = tk.BooleanVar(value=True)
-    app.chk_include_nsfw = ttk.Checkbutton(chk_sub, text="NSFW 채널 검색 포함", variable=app.var_include_nsfw, style='Card.TCheckbutton')
-    app.chk_include_nsfw.grid(row=1, column=0, sticky="w", padx=2, pady=3)
-
     app.var_include_pinned = tk.BooleanVar(value=False)
-    app.chk_include_pinned = ttk.Checkbutton(chk_sub, text="핀 고정 메시지도 삭제", variable=app.var_include_pinned, style='Card.TCheckbutton')
-    app.chk_include_pinned.grid(row=1, column=1, sticky="w", padx=2, pady=3)
+    app.chk_include_pinned = ttk.Checkbutton(chk_sub, text="핀 고정 메시지도 삭제", variable=app.var_include_pinned, style='Card.TCheckbutton', command=app.update_checkbox_ux)
+    app.chk_include_pinned.grid(row=1, column=0, sticky="w", padx=2, pady=3)
+
+    app.var_backup_deleted = tk.BooleanVar(value=False)
+    app.chk_backup_deleted = ttk.Checkbutton(chk_sub, text="지운 메시지 PC에 백업", variable=app.var_backup_deleted, style='Card.TCheckbutton', command=app.update_checkbox_ux)
+    app.chk_backup_deleted.grid(row=1, column=1, sticky="w", padx=2, pady=3)
 
     # ---- Card 4: 지연 시간 및 우회 속도 설정 ----
     app.card4 = ttk.LabelFrame(top_frame, text="  지연 시간 및 우회 속도 설정  ", style='Card.TLabelframe')
@@ -243,10 +240,10 @@ def create_widgets(app):
     app.entry_min_delay = tk.Entry(delay_grid, textvariable=app.var_min_delay, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
     app.entry_min_delay.grid(row=1, column=1, sticky="ew", padx=2, pady=2, ipady=3)
 
-    # 최대 랜덤 지연
+    # 최대 랜덤 지연 (기본 권장 최대 삭제 대기 시간을 3000ms에서 5000ms로 변경)
     app.lbl_max_delay = ttk.Label(delay_grid, text="최대 삭제 대기 (밀리초)", style='Card.TLabel')
     app.lbl_max_delay.grid(row=0, column=2, sticky="w", padx=2)
-    app.var_max_delay = tk.IntVar(value=3000)
+    app.var_max_delay = tk.IntVar(value=5000)
     app.entry_max_delay = tk.Entry(delay_grid, textvariable=app.var_max_delay, bg=app.bg_input, fg=app.fg_white, insertbackground=app.fg_white, bd=1, relief="flat")
     app.entry_max_delay.grid(row=1, column=2, sticky="ew", padx=2, pady=2, ipady=3)
 
@@ -432,11 +429,7 @@ def update_ui_texts(app):
     
     # 카드 3: 상세 필터링
     app.lbl_search_text.configure(text=msg['search_text_label'])
-    app.lbl_pattern.configure(text=msg['pattern_label'])
-    app.chk_has_link.configure(text=msg['chk_has_link'])
-    app.chk_has_file.configure(text=msg['chk_has_file'])
-    app.chk_include_nsfw.configure(text=msg['chk_include_nsfw'])
-    app.chk_include_pinned.configure(text=msg['chk_include_pinned'])
+    update_checkbox_ux(app)
     
     # 카드 4: 지연 대기 설정
     app.lbl_search_delay.configure(text=msg['search_delay_label'])
@@ -460,3 +453,29 @@ def update_ui_texts(app):
     # 토글 버튼 텍스트 변경
     next_lang_name = "한국어" if lang == 'en' else "English"
     app.btn_lang_toggle.configure(text=f"🌐 {next_lang_name}")
+
+
+def update_checkbox_ux(app):
+    """체크박스의 체크 여부에 따라 [활성] / [비활성] 접두사를 붙여 시각적으로 상태를 인지하기 쉽게 합니다."""
+    try:
+        msg = MESSAGES[app.current_lang]
+        status_active = msg.get('status_active', "[활성] ")
+        status_inactive = msg.get('status_inactive', "[비활성] ")
+        
+        # 1. 링크 포함 메시지
+        has_link_text = f"{status_active if app.var_has_link.get() else status_inactive}{msg.get('chk_has_link', '링크 포함 메시지만 삭제')}"
+        app.chk_has_link.configure(text=has_link_text)
+        
+        # 2. 파일 첨부 메시지
+        has_file_text = f"{status_active if app.var_has_file.get() else status_inactive}{msg.get('chk_has_file', '파일 첨부 메시지만 삭제')}"
+        app.chk_has_file.configure(text=has_file_text)
+        
+        # 3. 핀 고정 메시지
+        include_pinned_text = f"{status_active if app.var_include_pinned.get() else status_inactive}{msg.get('chk_include_pinned', '핀 고정 메시지도 삭제')}"
+        app.chk_include_pinned.configure(text=include_pinned_text)
+        
+        # 4. 지운 메시지 백업
+        backup_deleted_text = f"{status_active if app.var_backup_deleted.get() else status_inactive}{msg.get('chk_backup_deleted', '지운 메시지 PC에 백업')}"
+        app.chk_backup_deleted.configure(text=backup_deleted_text)
+    except Exception as e:
+        print(f"체크박스 UX 업데이트 에러: {e}")
