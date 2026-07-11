@@ -7,7 +7,6 @@ import ssl
 import hashlib
 import json
 import base64
-from curl_cffi import requests
 from requests.adapters import HTTPAdapter
 from urllib3.connectionpool import HTTPSConnectionPool
 from undiscord_utils import validate_discord_url
@@ -109,6 +108,7 @@ def get_browser_headers(token: str, referer: str = None) -> dict:
 
 def fetch_guilds(token: str) -> list:
     """주어진 디스코드 토큰을 사용하여 사용자가 참여 중인 서버(Guild) 목록을 가져옵니다."""
+    from curl_cffi import requests
     url = "https://discord.com/api/v9/users/@me/guilds"
     validate_discord_url(url)
     
@@ -129,6 +129,7 @@ def fetch_channels(token: str, guild_id: str) -> list:
     특정 서버 ID에 속한 채널 목록을 가져옵니다.
     guild_id가 '@me'일 경우 개인 DM 채널 목록을 가져옵니다.
     """
+    from curl_cffi import requests
     if guild_id == "@me":
         url = "https://discord.com/api/v9/users/@me/channels"
         referer = "https://discord.com/channels/@me"

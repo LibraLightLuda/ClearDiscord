@@ -7,7 +7,6 @@ import json
 from tkinter import messagebox
 from undiscord_i18n import MESSAGES
 from undiscord_crypto import decrypt_data, wipe_memory_string
-from undiscord_dialogs import PasswordDialog
 from undiscord_layout import update_ui_texts
 
 def restore_token_session(app, data):
@@ -38,6 +37,7 @@ def restore_token_session(app, data):
         
         while retry_count < max_attempts:
             # 복호화용 패스워드 입력창은 mode="enter"로 띄웁니다.
+            from undiscord_dialogs import PasswordDialog
             dlg = PasswordDialog(
                 app.root, 
                 mode="enter",
@@ -107,6 +107,7 @@ def restore_token_session(app, data):
     else:
         # 최초 실행 등으로 인해 비밀번호 정보가 아예 저장되지 않은 경우 실행 시 우선 설정하도록 강제
         app.write_log('info', msg['log_pass_no_exist'])
+        from undiscord_dialogs import PasswordDialog
         dlg = PasswordDialog(app.root, mode="set", lang=app.current_lang)
         
         if dlg.result is not None:

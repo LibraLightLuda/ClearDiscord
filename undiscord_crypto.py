@@ -14,28 +14,45 @@ import subprocess
 # 필수 의존성 라이브러리 검사 및 동적 자동 설치
 # ==================================================
 
-# cryptography (토큰 안전 대칭키 암호화 및 유도)
-try:
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    from cryptography.hazmat.primitives import hashes
-except ImportError:
-    # PyInstaller 패키징 환경(EXE 실행)인 경우 재귀적 pip 실행 방지
-    if getattr(sys, 'frozen', False):
-        print("[오류] 패키징된 실행 파일 내부에 'cryptography' 라이브러리가 누락되었습니다.")
-        print("빌드 시점에 'cryptography' 패키지가 포함되도록 빌드 환경을 재구성하십시오.")
-        sys.exit(1)
+# cryptography (토큰 안전 대칭키 암호화 및 유도) - 기동 최적화를 위해 지연 로딩 도입
+_cryptography_loaded = False
+AESGCM = None
+PBKDF2HMAC = None
+hashes = None
+
+def _ensure_cryptography():
+    global _cryptography_loaded, AESGCM, PBKDF2HMAC, hashes
+    if _cryptography_loaded:
+        return
         
-    print("보안 암호화를 위해 'cryptography' 라이브러리가 필요합니다. 자동 설치를 시작합니다...")
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "cryptography"])
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.primitives import hashes
-        print("'cryptography' 라이브러리가 성공적으로 설치되었습니다.")
-    except Exception as e:
-        print(f"라이브러리 자동 설치 실패. 수동으로 'pip install cryptography'를 실행해 주세요. 에러: {e}")
-        sys.exit(1)
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC as _PBKDF2HMAC
+        from cryptography.hazmat.primitives import hashes as _hashes
+        AESGCM = _AESGCM
+        PBKDF2HMAC = _PBKDF2HMAC
+        hashes = _hashes
+    except ImportError:
+        if getattr(sys, 'frozen', False):
+            print("[오류] 패키징된 실행 파일 내부에 'cryptography' 라이브러리가 누락되었습니다.")
+            print("빌드 시점에 'cryptography' 패키지가 포함되도록 빌드 환경을 재구성하십시오.")
+            sys.exit(1)
+            
+        print("보안 암호화를 위해 'cryptography' 라이브러리가 필요합니다. 자동 설치를 시작합니다...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "cryptography"])
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _AESGCM
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC as _PBKDF2HMAC
+            from cryptography.hazmat.primitives import hashes as _hashes
+            AESGCM = _AESGCM
+            PBKDF2HMAC = _PBKDF2HMAC
+            hashes = _hashes
+            print("'cryptography' 라이브러리가 성공적으로 설치되었습니다.")
+        except Exception as e:
+            print(f"라이브러리 자동 설치 실패. 수동으로 'pip install cryptography'를 실행해 주세요. 에러: {e}")
+            sys.exit(1)
+            
+    _cryptography_loaded = True
 
 
 def derive_key(password: str, salt: bytes) -> bytes:
@@ -44,6 +61,7 @@ def derive_key(password: str, salt: bytes) -> bytes:
     PBKDF2-HMAC-SHA256 알고리즘을 사용해 안전한 32바이트(256비트) 대칭 키를 유도합니다.
     OWASP 권장사항에 부합하도록 반복 횟수(iterations)를 600,000회로 적용합니다.
     """
+    _ensure_cryptography()
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -59,6 +77,7 @@ def encrypt_data(data: str, password: str) -> tuple[str, str, str]:
     12바이트 무작위 Nonce와 16바이트 무작위 Salt를 사용하여 암호문을 생성하며,
     암호문과 검증 문자열은 base64 형태로 패킹되어 반환됩니다.
     """
+    _ensure_cryptography()
     salt = os.urandom(16)
     key = derive_key(password, salt)
     
@@ -82,6 +101,7 @@ def decrypt_data(enc_data: str, password: str, salt_str: str, verify_str: str) -
     저장된 암호문과 솔트, 검증 토큰을 사용자가 입력한 비밀번호로 AES-256-GCM 복호화합니다.
     비밀번호가 올바르지 않거나 데이터가 임의 위조/손상된 경우 ValueError("복호화 실패")를 발생시킵니다.
     """
+    _ensure_cryptography()
     try:
         salt = base64.b64decode(salt_str.encode('utf-8'))
         key = derive_key(password, salt)
@@ -115,6 +135,7 @@ def encrypt_ipc(data: str, key_hex: str) -> str:
     일회성 16진수 키(key_hex)를 사용하여 데이터를 AES-GCM으로 간편하게 암호화합니다.
     자식 프로세스에서 토큰을 표준 출력으로 암호화하여 전달할 때 사용됩니다.
     """
+    _ensure_cryptography()
     key = bytes.fromhex(key_hex)
     aesgcm = AESGCM(key)
     nonce = os.urandom(12)
@@ -127,6 +148,7 @@ def decrypt_ipc(enc_data: str, key_hex: str) -> str:
     일회성 16진수 키(key_hex)를 사용하여 암호화된 데이터를 복호화합니다.
     부모 프로세스에서 자식 프로세스가 출력한 암호화된 토큰을 읽을 때 사용됩니다.
     """
+    _ensure_cryptography()
     key = bytes.fromhex(key_hex)
     aesgcm = AESGCM(key)
     raw_bytes = base64.b64decode(enc_data.encode('utf-8'))

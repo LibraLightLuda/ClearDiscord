@@ -8,7 +8,6 @@ Undiscord Core 엔진 모듈
 import re
 import time
 import random
-from curl_cffi import requests
 import base64
 import json
 from datetime import datetime
@@ -51,6 +50,7 @@ class UndiscordCore:
             'etr': 0
         }
 
+        from curl_cffi import requests
         self.session = requests.Session(impersonate="chrome120")
         self.session.trust_env = False
         # 만인간 공격(MitM) 프록시 탈취 방지를 위해 로컬 프록시 우회 설정 강제 주입

@@ -34,15 +34,27 @@ from undiscord_crypto import (
     wipe_memory_string
 )
 from undiscord_layout import setup_styles, create_widgets, update_ui_texts
-from undiscord_core import UndiscordCore
-from undiscord_client import fetch_guilds, fetch_channels
-from undiscord_dialogs import PasswordDialog
 from undiscord_i18n import get_system_language, MESSAGES
 
 # ==================================================
 # 하위 호환성 (Re-export) 정의
 # ==================================================
 __all__ = ['UndiscordCore', 'PasswordDialog', 'to_snowflake', 'ms_to_hms']
+
+def __getattr__(name):
+    if name == 'UndiscordCore':
+        from undiscord_core import UndiscordCore
+        return UndiscordCore
+    elif name == 'PasswordDialog':
+        from undiscord_dialogs import PasswordDialog
+        return PasswordDialog
+    elif name == 'fetch_guilds':
+        from undiscord_client import fetch_guilds
+        return fetch_guilds
+    elif name == 'fetch_channels':
+        from undiscord_client import fetch_channels
+        return fetch_channels
+    raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
 
@@ -180,6 +192,7 @@ class UndiscordGUIApp:
         if self.session_password is not None:
             return
 
+        from undiscord_dialogs import PasswordDialog
         dlg = PasswordDialog(self.root, mode="set", lang=self.current_lang)
         if dlg.result is not None:
             if dlg.result == "":
@@ -554,6 +567,7 @@ class UndiscordGUIApp:
         self.progress_bar.configure(value=0)
         self.click_clear_log()
 
+        from undiscord_core import UndiscordCore
         self.engine = UndiscordCore(
             options=options,
             log_queue=self.log_queue,
@@ -958,6 +972,7 @@ class UndiscordGUIApp:
     def _load_guilds_worker(self, token):
         """실제 API 연동을 수행하는 워커 스레드 함수입니다."""
         try:
+            from undiscord_client import fetch_guilds
             guilds = fetch_guilds(token)
             self.root.after(0, self._load_guilds_success, guilds)
         except Exception as e:
@@ -1045,6 +1060,7 @@ class UndiscordGUIApp:
     def _load_channels_worker(self, token, guild_id):
         """채널 목록 API 호출을 진행하는 워커 스레드 함수입니다."""
         try:
+            from undiscord_client import fetch_channels
             channels = fetch_channels(token, guild_id)
             self.root.after(0, self._load_channels_success, channels, guild_id)
         except Exception as e:
